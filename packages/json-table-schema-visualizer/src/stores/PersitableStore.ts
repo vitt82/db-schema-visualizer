@@ -18,12 +18,18 @@ export class PersistableStore<T> {
   persist(name: string, value: T): void {
     const persistanceKey = this.createPersistanceKey(name);
 
+    // debug persist
+    // eslint-disable-next-line no-console
+    console.debug("PersistableStore.persist", persistanceKey, value);
     this.storage.setItem(persistanceKey, value);
   }
 
   retrieve(name: string): object | null {
     const persistanceKey = this.createPersistanceKey(name);
 
+    // debug retrieve
+    // eslint-disable-next-line no-console
+    console.debug("PersistableStore.retrieve", persistanceKey);
     return this.storage.getItem(persistanceKey);
   }
 

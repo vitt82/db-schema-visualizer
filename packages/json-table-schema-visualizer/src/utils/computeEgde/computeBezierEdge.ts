@@ -77,6 +77,17 @@ export function getBezierPath({
     c: curvature,
   });
 
+  // debug: print computed values for tracing incorrect anchors
+  // eslint-disable-next-line no-console
+  console.debug("getBezierPath: bezier inputs", {
+    source,
+    target,
+    sourcePosition,
+    targetPosition,
+    sourceControl: [sourceControlX, sourceControlY],
+    targetControl: [targetControlX, targetControlY],
+  });
+
   const sourceOffset = compteSymbolOffset(sourcePosition, source);
   const targetOffset = compteSymbolOffset(targetPosition, target);
 

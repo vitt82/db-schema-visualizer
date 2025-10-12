@@ -35,8 +35,13 @@ const computeTablesPositions = (
   dagre.layout(graph);
 
   graph.nodes().forEach((node) => {
-    const { x, y } = graph.node(node);
-    tablesPositions.set(node, { x, y });
+    const n = graph.node(node);
+    if (n != null) {
+      // dagre returns center coordinates; convert to top-left for Konva groups
+      const x = n.x - (n.width ?? 0) / 2;
+      const y = n.y - (n.height ?? 0) / 2;
+      tablesPositions.set(node, { x, y });
+    }
   });
   return tablesPositions;
 };

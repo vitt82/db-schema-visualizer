@@ -10,8 +10,6 @@ const AutoArrangeTableButton = () => {
   return (
     <ToolbarButton onClick={resetPositions} title="Auto-arrange">
       <LayoutPanelLeftIcon />
-
-      <span className="ml-2">Auto-arrange</span>
     </ToolbarButton>
   );
 };

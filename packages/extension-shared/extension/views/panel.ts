@@ -33,6 +33,7 @@ export class MainPanel {
   private _lastTimeout: NodeJS.Timeout | null = null;
   public static parseCode: (code: string) => JSONTableSchema;
   public static fileExt: string;
+  public static lastDocument: TextDocument | undefined;
   public static diagnosticCollection =
     languages.createDiagnosticCollection("dbml");
 
@@ -65,6 +66,7 @@ export class MainPanel {
       this._panel.webview,
       extensionConfig,
       this._disposables,
+      MainPanel.refreshCurrentSchema,
     );
   }
 
@@ -166,6 +168,9 @@ export class MainPanel {
     try {
       const schema = MainPanel.parseCode(code);
 
+      // remember last document used to allow refresh without an active editor
+      MainPanel.lastDocument = document;
+
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.currentPanel?._panel.webview.postMessage({
         type: "setSchema",
@@ -195,6 +200,26 @@ export class MainPanel {
         window.showErrorMessage(`${error as any}`);
       }
     }
+  };
+
+  static refreshCurrentSchema = (): void => {
+    const editor = MainPanel.getCurrentEditor();
+    if (editor != null) {
+      MainPanel.publishSchema(editor.document);
+      return;
+    }
+
+    // fallback to last published document if any
+    if (MainPanel.lastDocument != null) {
+      MainPanel.publishSchema(MainPanel.lastDocument);
+      return;
+    }
+
+    // no editor and no cached document
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    window.showErrorMessage(
+      "No active text editor found and no cached document to refresh.",
+    );
   };
 
   /**

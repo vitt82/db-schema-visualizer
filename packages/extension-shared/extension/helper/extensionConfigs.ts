@@ -42,7 +42,14 @@ export class ExtensionConfig {
   getDefaultPageConfig(): DefaultPageConfig {
     const theme = this.getPreferredTheme();
     const scrollDirection = this.getScrollDirection();
+    const autoLayout = this.config.get(
+      ConfigKeys.autoLayoutOnStructuralChange,
+    ) as boolean | undefined;
 
-    return { theme, scrollDirection };
+    return {
+      theme,
+      scrollDirection,
+      autoLayoutOnStructuralChange: autoLayout ?? true,
+    };
   }
 }

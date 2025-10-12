@@ -45,11 +45,16 @@ export class WebviewHelper {
     command: string,
     message: string,
     extensionConfig: ExtensionConfig,
+    onRefreshSchema?: () => void,
   ): void {
     switch (command) {
       case WebviewCommand.SET_THEME_PREFERENCES:
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         extensionConfig.setTheme(message as Theme);
+        break;
+      case WebviewCommand.REFRESH_SCHEMA:
+        // Trigger schema refresh
+        onRefreshSchema?.();
         break;
       default:
     }
@@ -59,6 +64,7 @@ export class WebviewHelper {
     webview: Webview,
     extensionConfig: ExtensionConfig,
     disposables: Disposable[],
+    onRefreshSchema?: () => void,
   ): void {
     webview.onDidReceiveMessage(
       (message: WebviewPostMessage) => {
@@ -69,6 +75,7 @@ export class WebviewHelper {
           command,
           textMessage,
           extensionConfig,
+          onRefreshSchema,
         );
       },
       undefined,

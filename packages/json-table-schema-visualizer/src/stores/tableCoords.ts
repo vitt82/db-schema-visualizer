@@ -76,6 +76,8 @@ class TableCoordsStore extends PersistableStore<Array<[string, XYPosition]>> {
 
   public setCoords(table: string, coords: XYPosition): void {
     this.tableCoords.set(table, coords);
+    // Auto-save when coordinates change
+    this.saveCurrentStore();
   }
 
   public remove(table: string): void {

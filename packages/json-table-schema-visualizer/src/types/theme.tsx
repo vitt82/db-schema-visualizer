@@ -20,6 +20,7 @@ export interface ThemeColors {
     bg: string;
     shadow: string;
   };
+  enumBg: string;
   red: string;
   green: string;
   enumItem: string;

@@ -1,17 +1,20 @@
 {
   "name": "prisma-erd-visualizer",
-  "displayName": "Prisma Entity-Relationship Diagrams visualizer",
+  "displayName": "Prisma ERD Visualizer (local)",
   "description": "A VsCode extension that lets you visualize the ERD (Entity Relationship Diagram) of your prisma database structure.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "icon": "assets/logo.png",
-  "publisher": "bocovo",
+  "publisher": "vitt",
   "engines": {
     "vscode": "^1.87.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:prisma",
+    "onCommand:prisma-erd-visualizer.previewDiagrams"
+  ],
   "main": "./dist/extension/index.js",
   "contributes": {
     "commands": [
@@ -59,11 +62,17 @@
             "To zoom out when scrolling up",
             "To zoom in when scrolling up"
           ]
+        },
+        "prismaERDPreviewer.autoLayoutOnStructuralChange": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true the diagram will auto-recompute layout when tables/enums/relations change. Disable to keep manual positions stable."
         }
       }
     }
   },
   "scripts": {
+    "dev": "vite",
     "vscode:prepublish": "yarn run package",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
@@ -97,6 +106,7 @@
   "dependencies": {
     "json-table-schema-visualizer": "1.0.0",
     "prisma-to-json-table-schema": "0.0.1",
+    "extension-shared": "file:../extension-shared",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "shared": "0.0.0"

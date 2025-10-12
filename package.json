@@ -26,7 +26,8 @@
     "prettier": "3.2.5",
     "ts-jest": "^29.1.2",
     "tsc-files": "^1.1.4",
-    "typescript": "^5.4.3"
+    "typescript": "^5.4.3",
+    "vsce": "^2.15.0"
   },
   "scripts": {
     "prepare": "husky"

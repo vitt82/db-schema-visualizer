@@ -14,8 +14,6 @@ const FullDetailLevel = ({ onClick }: DetailLevelToggleProps) => {
   return (
     <ToolbarButton title="Full Details" onClick={onClick}>
       <PanelsTopLeftIcon />
-
-      <span className="ml-2">Full Details</span>
     </ToolbarButton>
   );
 };
@@ -23,8 +21,6 @@ const HeaderOnlyLevel = ({ onClick }: DetailLevelToggleProps) => {
   return (
     <ToolbarButton title="Header Only" onClick={onClick}>
       <PanelTopIcon />
-
-      <span className="ml-2">Header Only</span>
     </ToolbarButton>
   );
 };
@@ -32,8 +28,6 @@ const KeyOnlyLevel = ({ onClick }: DetailLevelToggleProps) => {
   return (
     <ToolbarButton title="Key Only" onClick={onClick}>
       <KeyRoundIcon />
-
-      <span className="ml-2">Key Only</span>
     </ToolbarButton>
   );
 };

@@ -14,6 +14,7 @@ export const defaultThemeConfig: ThemeColors = {
     bg: "white",
     shadow: "black",
   },
+  enumBg: "#E6F9EA",
   tableHeader: {
     bg: "#F8FAFC",
     fg: "black",
@@ -22,7 +23,7 @@ export const defaultThemeConfig: ThemeColors = {
   green: "#00FF00",
   enumItem: "#ccc",
   white: "white",
-  noteBg: "#000000d6",
+  noteBg: "#b2f5a4d6",
   bg: "white",
 };
 
@@ -40,6 +41,7 @@ export const darkThemeConfig: ThemeColors = {
     bg: "#2F2F2F",
     shadow: "rgba(255, 255, 255, 0.1)",
   },
+  enumBg: "#163d14",
   tableHeader: {
     bg: "#1E1E1E",
     fg: "#CCCCCC",

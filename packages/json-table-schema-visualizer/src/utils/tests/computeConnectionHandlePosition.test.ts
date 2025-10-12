@@ -10,10 +10,11 @@ describe("compute connection handle positions", () => {
       targetW: 300,
       targetX: 300,
     };
+    // With top-left coords, centers are source=150 target=450 -> expect Right->Left anchors
     expect(computeConnectionHandlePos(input)).toEqual([
+      Position.Right,
       Position.Left,
-      Position.Left,
-      input.sourceX,
+      input.sourceX + input.sourceW,
       input.targetX,
     ]);
   });
@@ -44,7 +45,7 @@ describe("compute connection handle positions", () => {
       Position.Left,
       Position.Right,
       input.sourceX,
-      input.targetW + input.targetX,
+      input.targetX + input.targetW,
     ]);
   });
 });

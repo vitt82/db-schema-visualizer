@@ -4,6 +4,7 @@
     {
       "type": "npm",
       "script": "dev",
+      "label": "dbml: dev",
       "problemMatcher": {
         "owner": "typescript",
         "fileLocation": "relative",
@@ -55,6 +56,39 @@
         "isDefault": true
       },
       "problemMatcher": [],
+      "options": {
+        "cwd": "${workspaceFolder}/packages/prisma-vs-code-extension"
+      }
+    },
+    {
+      "type": "npm",
+      "script": "dev",
+      "label": "prisma: dev",
+      "problemMatcher": {
+        "owner": "typescript",
+        "fileLocation": "relative",
+        "pattern": {
+          "regexp": "^([a-zA-Z]\\:/?([\\w\\-]/?)+\\.\\w+):(\\d+):(\\d+): (ERROR|WARNING)\\: (.*)$",
+          "file": 1,
+          "line": 3,
+          "column": 4,
+          "code": 5,
+          "message": 6
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*extension build start*$",
+          "endsPattern": "^.*extension (build|rebuild) success.*$"
+        }
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "never"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
       "options": {
         "cwd": "${workspaceFolder}/packages/prisma-vs-code-extension"
       }
