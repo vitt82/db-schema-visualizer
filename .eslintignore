@@ -1,3 +1,13 @@
 .eslintrc.js
 .lintstagedrc.js
 *.config.js
+
+# Ignore compiled JS placed into src/ by some local builds
+# Ignore compiled JS placed into src/ by some local builds (recursive)
+packages/**/src/**/*.js
+
+# Also ignore any JS under packages/shared (we keep TS sources there)
+packages/shared/**/*.js
+
+# Ignore our local linked shared package (dev symlink)
+node_modules/shared/**
