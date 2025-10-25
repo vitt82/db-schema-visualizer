@@ -5,23 +5,7 @@
       "type": "npm",
       "script": "dev",
       "label": "dbml: dev",
-      "problemMatcher": {
-        "owner": "typescript",
-        "fileLocation": "relative",
-        "pattern": {
-          "regexp": "^([a-zA-Z]\\:/?([\\w\\-]/?)+\\.\\w+):(\\d+):(\\d+): (ERROR|WARNING)\\: (.*)$",
-          "file": 1,
-          "line": 3,
-          "column": 4,
-          "code": 5,
-          "message": 6
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "^.*extension build start*$",
-          "endsPattern": "^.*extension (build|rebuild) success.*$"
-        }
-      },
+        "problemMatcher": ["$tsc"],
       "isBackground": true,
       "presentation": {
         "reveal": "never"
@@ -39,7 +23,7 @@
       "script": "build",
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       },
       "problemMatcher": [],
       "options": {
@@ -53,7 +37,7 @@
       "script": "build:prisma",
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       },
       "problemMatcher": [],
       "options": {
@@ -64,23 +48,7 @@
       "type": "npm",
       "script": "dev",
       "label": "prisma: dev",
-      "problemMatcher": {
-        "owner": "typescript",
-        "fileLocation": "relative",
-        "pattern": {
-          "regexp": "^([a-zA-Z]\\:/?([\\w\\-]/?)+\\.\\w+):(\\d+):(\\d+): (ERROR|WARNING)\\: (.*)$",
-          "file": 1,
-          "line": 3,
-          "column": 4,
-          "code": 5,
-          "message": 6
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "^.*extension build start*$",
-          "endsPattern": "^.*extension (build|rebuild) success.*$"
-        }
-      },
+      "problemMatcher": ["$tsc"],
       "isBackground": true,
       "presentation": {
         "reveal": "never"
