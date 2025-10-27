@@ -2,7 +2,7 @@
   "name": "prisma-erd-visualizer",
   "displayName": "Prisma ERD Visualizer (local)",
   "description": "A VsCode extension that lets you visualize the ERD (Entity Relationship Diagram) of your prisma database structure.",
-  "version": "0.4.1",
+  "version": "0.4.4",
   "icon": "assets/logo.png",
   "publisher": "vitt",
   "engines": {
@@ -13,7 +13,8 @@
   ],
   "activationEvents": [
     "onLanguage:prisma",
-    "onCommand:prisma-erd-visualizer.previewDiagrams"
+    "onCommand:prisma-erd-visualizer.previewDiagrams",
+    "onStartupFinished"
   ],
   "main": "./dist/extension/index.js",
   "contributes": {
@@ -25,6 +26,10 @@
           "light": "./assets/icons/open-preview.svg",
           "dark": "./assets/icons/open-preview-dark.svg"
         }
+      },
+      {
+        "command": "prisma-erd-visualizer.reloadPersistedData",
+        "title": "Prisma ERD: Reload saved diagram positions from .DBML/"
       }
     ],
     "menus": {
@@ -71,6 +76,9 @@
       }
     }
   },
+  "bundledDependencies": [
+    "extension-shared"
+  ],
   "scripts": {
     "dev": "vite",
     "vscode:prepublish": "yarn run package",
@@ -80,8 +88,7 @@
     "lint": "eslint src --ext ts",
     "test": "vscode-test",
     "build:prisma": "vite build && yarn run generate:css",
-    "package": "yarn run build:prisma",
-    "preview": "vite preview",
+  "package": "yarn run build:prisma",
     "create:package": "vsce package",
     "publish": "vsce publish",
     "generate:css": "cd ../json-table-schema-visualizer && npx tailwindcss -i ./src/styles/index.css >  ../prisma-vs-code-extension/dist/webview/assets/index.css --minify"

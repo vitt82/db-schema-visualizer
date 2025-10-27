@@ -2,7 +2,7 @@ import { commands, type ExtensionContext } from "vscode";
 
 import { parseDBMLToJSON } from "dbml-to-json-table-schema";
 
-import { MainPanel } from "extension-shared/extension/views/panel";
+import { MainPanel } from "../prisma-vs-code-extension/extension/extension-shared/extension/views/panel";
 import {
   EXTENSION_CONFIG_SESSION,
   WEB_VIEW_NAME,

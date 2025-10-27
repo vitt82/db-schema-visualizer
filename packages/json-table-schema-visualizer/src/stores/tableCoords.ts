@@ -35,9 +35,43 @@ class TableCoordsStore extends PersistableStore<Array<[string, XYPosition]>> {
   }
 
   public resetPositions(tables: JSONTableTable[], refs: JSONTableRef[]): void {
-    const newTablesPos = computeTablesPositions(tables, refs);
-    this.tableCoords = newTablesPos;
-    eventEmitter.emit(TableCoordsStore.RESET_POS_EVENT_NAME, newTablesPos);
+    const computed = computeTablesPositions(tables, refs);
+
+    // Start from in-memory positions
+    const merged = new Map<string, XYPosition>(this.tableCoords);
+
+    // Try to recover persisted positions for the current store key and merge them (persisted take precedence)
+    try {
+      const recovered = this.retrieve(this.currentStoreKey) as Array<
+        [string, XYPosition]
+      > | null;
+      if (recovered !== null && Array.isArray(recovered)) {
+        const recoveredMap = new Map<string, XYPosition>(recovered);
+        recoveredMap.forEach((pos, key) => {
+          merged.set(key, pos);
+        });
+        // eslint-disable-next-line no-console
+        console.debug(
+          "tableCoords: merged persisted positions",
+          this.currentStoreKey,
+          Array.from(recoveredMap.entries()),
+        );
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("tableCoords: failed to retrieve persisted positions", err);
+    }
+
+    // Fill missing positions (new tables) from computed layout
+    tables.forEach((t) => {
+      if (!merged.has(t.name)) {
+        const pos = computed.get(t.name);
+        if (pos !== undefined) merged.set(t.name, pos);
+      }
+    });
+
+    this.tableCoords = merged;
+    eventEmitter.emit(TableCoordsStore.RESET_POS_EVENT_NAME, merged);
   }
 
   public getCurrentStoreValue(): Map<string, XYPosition> {

@@ -67,7 +67,6 @@ export class MainPanel {
           const dbmlDir = Uri.joinPath(wsFolder, ".DBML");
           try {
             const entries = await workspace.fs.readDirectory(dbmlDir);
-            console.log("[MainPanel] Found .DBML directory with entries:", entries.length);
             for (const [name] of entries) {
               if (name.endsWith('.json')) {
                 try {
@@ -76,23 +75,19 @@ export class MainPanel {
                   const text = new TextDecoder().decode(data);
                   const key = name.replace(/\.json$/, '').replace(/__/g, ':');
                   persistedData[key] = JSON.parse(text);
-                  console.log("[MainPanel] Loaded persisted data - file:", name, "key:", key, "entries:", Array.isArray(persistedData[key]) ? (persistedData[key] as unknown[]).length : "not array");
                 } catch (e) {
                   // ignore file parse errors
-                  console.error('[MainPanel] Failed to read persisted file', name, e);
+                  console.error('Failed to read persisted file', name, e);
                 }
               }
             }
           } catch {
             // no .DBML folder yet
-            console.log("[MainPanel] No .DBML directory found");
           }
         }
       } catch (e) {
-        console.error('[MainPanel] Failed to collect persisted data for webview', e);
+        console.error('Failed to collect persisted data for webview', e);
       }
-
-      console.log("[MainPanel] Total persisted keys to inject:", Object.keys(persistedData).length, "keys:", Object.keys(persistedData));
 
       const html = WebviewHelper.setupHtml(
         webview,
@@ -140,28 +135,32 @@ export class MainPanel {
     parser,
     fileExt,
   }: ExtensionRenderProps): void {
+    console.log("[MainPanel.render] Starting render with fileExt:", fileExt);
     MainPanel.parseCode = parser;
     MainPanel.fileExt = fileExt;
 
     const editor = window.activeTextEditor;
-    if (editor == null) {
+    if (editor === null) {
+      console.log("[MainPanel.render] No active text editor found");
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       window.showErrorMessage("No active text editor found.");
       return;
     }
 
-    const activeTextEditorColumn =
-      window.activeTextEditor?.viewColumn ?? ViewColumn.One;
+    console.log("[MainPanel.render] Active editor found:", editor.document.uri.toString());
+
+    const activeTextEditorColumn = editor.viewColumn ?? ViewColumn.One;
 
     const previewColumn = activeTextEditorColumn + 1;
 
-    if (MainPanel.currentPanel != null) {
+    if (MainPanel.currentPanel) {
       // ALWAYS dispose the old panel to force reload of persisted data from .DBML/
       console.log("[MainPanel] Disposing existing panel to reload persisted data");
       MainPanel.currentPanel.dispose();
       MainPanel.currentPanel = undefined;
     }
 
+    console.log("[MainPanel.render] Creating new webview panel");
     // Always create a fresh panel to ensure persisted data is loaded
     const panel = window.createWebviewPanel(
       webviewConfig.name,
@@ -173,6 +172,7 @@ export class MainPanel {
       },
     );
 
+    console.log("[MainPanel.render] Panel created, setting icon path");
     panel.iconPath = {
       dark: Uri.joinPath(
         context.extensionUri,
@@ -188,19 +188,25 @@ export class MainPanel {
       ),
     };
 
+    console.log("[MainPanel.render] Creating MainPanel instance");
     MainPanel.currentPanel = new MainPanel(
       panel,
       context,
       extensionConfigSession,
     );
+
+    console.log("[MainPanel.render] Registering diagram updater");
     MainPanel.registerDiagramUpdaterOnfFileChange();
 
+    console.log("[MainPanel.render] Publishing schema");
     MainPanel.publishSchema(editor.document);
+
+    console.log("[MainPanel.render] Render completed successfully");
   }
 
   static getCurrentEditor(): TextEditor | undefined {
     const editor = window.activeTextEditor;
-    if (editor == null) {
+    if (editor === null) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       window.showErrorMessage("No active text editor found.");
       return;
@@ -258,13 +264,13 @@ export class MainPanel {
 
   static refreshCurrentSchema = (): void => {
     const editor = MainPanel.getCurrentEditor();
-    if (editor != null) {
+    if (editor !== null) {
       MainPanel.publishSchema(editor.document);
       return;
     }
 
     // fallback to last published document if any
-    if (MainPanel.lastDocument != null) {
+    if (MainPanel.lastDocument !== undefined) {
       MainPanel.publishSchema(MainPanel.lastDocument);
       return;
     }
@@ -280,7 +286,7 @@ export class MainPanel {
    * Reload persisted data from .DBML/ and send to webview
    */
   static async reloadPersistedData(): Promise<void> {
-    if (MainPanel.currentPanel?._panel == null) {
+    if (MainPanel.currentPanel?._panel === null) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       window.showErrorMessage("No diagram preview is open. Please open a Prisma diagram first.");
       return;
@@ -327,7 +333,7 @@ export class MainPanel {
     console.log("[MainPanel.reloadPersistedData] Sending", Object.keys(persistedData).length, "keys to webview");
 
     // Send to webview
-    await MainPanel.currentPanel._panel.webview.postMessage({
+    await MainPanel.currentPanel!._panel.webview.postMessage({
       command: "RELOAD_PERSISTED_DATA",
       persistedData,
     });
@@ -336,21 +342,31 @@ export class MainPanel {
     window.showInformationMessage(`Reloaded ${Object.keys(persistedData).length} persisted data entries from .DBML/`);
   }
 
-  /**
-   * Cleans up and disposes of webview resources when the webview panel is closed.
-   */
   public dispose(): void {
+    console.log("[MainPanel.dispose] Disposing panel and cleaning up resources");
+    
+    // Clear the current panel reference
     MainPanel.currentPanel = undefined;
 
-    // Dispose of the current webview panel
-    this._panel.dispose();
+    // Dispose of the webview panel
+    if (this._panel) {
+      this._panel.dispose();
+    }
 
-    // Dispose of all disposables (i.e. commands) for the current webview panel
+    // Dispose of all disposables
     while (this._disposables.length > 0) {
       const disposable = this._disposables.pop();
-      if (disposable != null) {
+      if (disposable) {
         disposable.dispose();
       }
     }
+
+    // Clear any pending timeouts
+    if (this._lastTimeout !== null) {
+      clearTimeout(this._lastTimeout);
+      this._lastTimeout = null;
+    }
+
+    console.log("[MainPanel.dispose] Disposal completed");
   }
 }

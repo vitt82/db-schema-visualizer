@@ -105,7 +105,7 @@ export class WebviewHelper {
       async (message: WebviewPostMessage) => {
         const command = message.command;
         const textMessage = message.message;
-        console.log("[WebviewHelper] Received message:", command, "payload length:", textMessage?.length ?? 0);
+        console.log("Received message", command, textMessage);
 
         // Handle file persistence commands directly here so we can use workspace.fs
         if (command === WebviewCommand.FILE_WRITE) {
@@ -114,18 +114,14 @@ export class WebviewHelper {
             const key: string = payload.key;
             const value = payload.value;
 
-            console.log("[WebviewHelper] FILE_WRITE - key:", key, "value length:", JSON.stringify(value).length);
-
             const wsFolder = workspace.workspaceFolders?.[0]?.uri;
-            if (!wsFolder) throw new Error("No workspace folder available");
+            if (!wsFolder) { throw new Error("No workspace folder available"); }
 
             const dbmlDir = Uri.joinPath(wsFolder, ".DBML");
             // ensure directory
             try {
               await workspace.fs.stat(dbmlDir);
-              console.log("[WebviewHelper] .DBML directory exists");
             } catch {
-              console.log("[WebviewHelper] Creating .DBML directory");
               await workspace.fs.createDirectory(dbmlDir);
             }
 
@@ -134,15 +130,13 @@ export class WebviewHelper {
             const content = new TextEncoder().encode(JSON.stringify(value, null, 2));
             await workspace.fs.writeFile(fileUri, content);
 
-            console.log("[WebviewHelper] Successfully wrote file:", filename);
-
             // ack back to webview
             void webview.postMessage({
               command: WebviewCommand.FILE_RESPONSE,
               message: JSON.stringify({ key, ok: true }),
             });
           } catch (err) {
-            console.error("[WebviewHelper] Failed to write persisted file", err);
+            console.error("Failed to write persisted file", err);
             void webview.postMessage({
               command: WebviewCommand.FILE_RESPONSE,
               message: JSON.stringify({ ok: false, error: String(err) }),
@@ -157,7 +151,7 @@ export class WebviewHelper {
             const payload = JSON.parse(textMessage);
             const key: string = payload.key;
             const wsFolder = workspace.workspaceFolders?.[0]?.uri;
-            if (!wsFolder) throw new Error("No workspace folder available");
+            if (!wsFolder) { throw new Error("No workspace folder available"); }
 
             const dbmlDir = Uri.joinPath(wsFolder, ".DBML");
             const filename = key.replace(/:/g, "__") + ".json";
@@ -176,44 +170,6 @@ export class WebviewHelper {
             });
           }
 
-          return;
-        }
-
-        // Webview asked the host to reload persisted data from .DBML and post back to the webview
-        if (command === WebviewCommand.RELOAD_PERSISTED_DATA_REQUEST) {
-          try {
-            const persistedData: Record<string, unknown> = {};
-            const wsFolder = workspace.workspaceFolders?.[0]?.uri;
-            if (!wsFolder) throw new Error("No workspace folder available");
-            const dbmlDir = Uri.joinPath(wsFolder, ".DBML");
-            try {
-              const entries = await workspace.fs.readDirectory(dbmlDir);
-              for (const [name] of entries) {
-                if (name.endsWith('.json')) {
-                  try {
-                    const fileUri = Uri.joinPath(dbmlDir, name);
-                    const data = await workspace.fs.readFile(fileUri);
-                    const text = new TextDecoder().decode(data);
-                    const key = name.replace(/\.json$/, '').replace(/__/g, ':');
-                    persistedData[key] = JSON.parse(text);
-                  } catch (e) {
-                    console.error('[WebviewHelper] Failed to read persisted file', name, e);
-                  }
-                }
-              }
-            } catch (err) {
-              console.log("[WebviewHelper] No .DBML directory found:", err);
-            }
-
-            await webview.postMessage({
-              command: WebviewCommand.RELOAD_PERSISTED_DATA,
-              // we embed the object directly here, the webview listener knows how to consume it
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              persistedData: persistedData as any,
-            } as unknown as WebviewPostMessage);
-          } catch (err) {
-            console.error("[WebviewHelper] Failed to handle RELOAD_PERSISTED_DATA_REQUEST", err);
-          }
           return;
         }
 

@@ -5,7 +5,7 @@ import { stageStateStore } from "json-table-schema-visualizer/src/stores/stagesS
 import { detailLevelStore } from "json-table-schema-visualizer/src/stores/detailLevelStore";
 import { enumCoordsStore } from "json-table-schema-visualizer/src/stores/enumCoords";
 
-import { type SetSchemaCommandPayload } from "../../extension/types/webviewCommand";
+import { type SetSchemaCommandPayload, WebviewCommand } from "../../extension/types/webviewCommand";
 
 export const useSchema = (): {
   schema: JSONTableSchema | null;
@@ -43,6 +43,50 @@ export const useSchema = (): {
     }
 
     setSchema(message.payload);
+    // notify extension host that schema was received and processed
+    const getVsCodeApi = (): { postMessage: (m: unknown) => void } | undefined => {
+      const win = window as unknown as Record<string, unknown>;
+      const maybeApi = (win as any).vsCodeWebviewAPI;
+      if (maybeApi != null && typeof (maybeApi as { postMessage?: unknown }).postMessage === "function") {
+        return maybeApi as { postMessage: (m: unknown) => void };
+      }
+
+      const maybeAcquire = (win as any).acquireVsCodeApi;
+      if (typeof maybeAcquire === "function") {
+        try {
+          return (maybeAcquire as () => { postMessage: (m: unknown) => void })();
+        } catch {
+          return undefined;
+        }
+      }
+
+      return undefined;
+    };
+
+    try {
+      const api = getVsCodeApi();
+      if (api != null && typeof api.postMessage === "function") {
+        const tablesCount = Array.isArray(message.payload?.tables) ? message.payload.tables.length : 0;
+        const enumsCount = Array.isArray(message.payload?.enums) ? message.payload.enums.length : 0;
+        const sampleTables = Array.isArray(message.payload?.tables)
+          ? message.payload.tables.slice(0, 5).map((t: any) => t.name ?? t.key ?? "<unnamed>")
+          : [];
+
+        api.postMessage({
+          command: WebviewCommand.SCHEMA_RECEIVED,
+          message: JSON.stringify({
+            key: message.key,
+            ok: true,
+            tables: tablesCount,
+            enums: enumsCount,
+            sampleTables,
+          }),
+        });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("useSchema: failed to post SCHEMA_RECEIVED ack", err);
+    }
   };
 
   useEffect(() => {

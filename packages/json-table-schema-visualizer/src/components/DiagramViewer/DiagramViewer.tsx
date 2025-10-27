@@ -20,11 +20,27 @@ interface DiagramViewerProps {
   tables: JSONTableTable[];
   refs: JSONTableRef[];
   enums: JSONTableEnum[];
+  schemaKey?: string | null;
 }
 
-const DiagramViewer = ({ refs, tables, enums }: DiagramViewerProps) => {
+const DiagramViewer = ({ refs, tables, enums, schemaKey }: DiagramViewerProps) => {
   if (tables.length === 0) {
     return <EmptyTableMessage />;
+  }
+
+  // post a small health report to the extension host to confirm rendering
+  try {
+    const win = window as unknown as Record<string, unknown>;
+    const maybeApi = (win as any).vsCodeWebviewAPI ?? (typeof (win as any).acquireVsCodeApi === "function" ? (win as any).acquireVsCodeApi() : undefined);
+    if (maybeApi != null && typeof maybeApi.postMessage === "function") {
+      const sampleTables = Array.isArray(tables) ? tables.slice(0, 5).map((t: any) => t.name ?? t.key ?? "<unnamed>") : [];
+      maybeApi.postMessage({
+        command: "WEBVIEW_RENDERED",
+        message: JSON.stringify({ key: schemaKey ?? null, tables: tables.length, enums: Array.isArray(enums) ? enums.length : 0, sampleTables }),
+      });
+    }
+  } catch (err) {
+    // ignore
   }
 
   return (

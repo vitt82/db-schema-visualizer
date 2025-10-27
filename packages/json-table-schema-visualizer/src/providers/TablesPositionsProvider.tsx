@@ -61,18 +61,8 @@ const TablesPositionsProvider = ({
   useEffect(() => {
     const autoLayoutPref = (window as any).EXTENSION_DEFAULT_CONFIG
       ?.autoLayoutOnStructuralChange;
-    if (autoLayoutPref === false) {
-      // user disabled auto-layout on structural change
-      // eslint-disable-next-line no-console
-      console.debug(
-        "TablesPositionsProvider: autoLayoutOnStructuralChange disabled by user preference",
-      );
-      return;
-    }
-    const lastFingerprintRef: { current?: string } = {} as any;
 
-    // store the last fingerprint in a closure variable on the element to persist across renders
-    // We'll attach it to the provider function object to avoid adding more state.
+    const lastFingerprintRef: { current?: string } = {} as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const key = "__tablesPositionsFingerprint" as any;
     lastFingerprintRef.current = (TablesPositionsProvider as any)[key] as
@@ -80,18 +70,27 @@ const TablesPositionsProvider = ({
       | undefined;
 
     const fingerprint = computeStructureFingerprint(tables, refs, enums);
+
+    // If there are already coordinates loaded (e.g., from persistence), don't override them on first render
+    const currentSize = tableCoordsStore.getCurrentStoreValue().size;
+
     if (lastFingerprintRef.current !== fingerprint) {
-      // debug
-      // eslint-disable-next-line no-console
-      console.debug(
-        "TablesPositionsProvider: structural change detected, resetting positions",
-        {
-          prev: lastFingerprintRef.current,
-          next: fingerprint,
-        },
-      );
-      resetPositions();
-      // persist fingerprint
+      // Only auto-reset if user preference allows it. Otherwise, skip.
+      if (autoLayoutPref !== false) {
+        // eslint-disable-next-line no-console
+        console.debug(
+          "TablesPositionsProvider: structural change detected, applying resetPositions with merge",
+          { prev: lastFingerprintRef.current, next: fingerprint, currentSize },
+        );
+        // resetPositions now merges with persisted and current positions
+        resetPositions();
+      } else {
+        // eslint-disable-next-line no-console
+        console.debug(
+          "TablesPositionsProvider: autoLayoutOnStructuralChange disabled, skipping resetPositions",
+          { prev: lastFingerprintRef.current, next: fingerprint, currentSize },
+        );
+      }
       (TablesPositionsProvider as any)[key] = fingerprint;
     }
 

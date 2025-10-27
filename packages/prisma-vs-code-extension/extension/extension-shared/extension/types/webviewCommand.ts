@@ -12,10 +12,6 @@ export enum WebviewCommand {
   WEBVIEW_ERROR = "WEBVIEW_ERROR",
   // webview -> host after successful render with counts
   WEBVIEW_RENDERED = "WEBVIEW_RENDERED",
-  // webview -> host: request to reload persisted data from .DBML and push to webview
-  RELOAD_PERSISTED_DATA_REQUEST = "RELOAD_PERSISTED_DATA_REQUEST",
-  // host -> webview: reload persisted data from .DBML/
-  RELOAD_PERSISTED_DATA = "RELOAD_PERSISTED_DATA",
 }
 
 export interface WebviewPostMessage {

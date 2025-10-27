@@ -48,7 +48,7 @@ const App = () => {
       <ScrollDirectionProvider
         scrollDirection={window.EXTENSION_DEFAULT_CONFIG?.scrollDirection}
       >
-        <DiagramViewer key={key} {...schema} />
+  <DiagramViewer key={key ?? undefined} schemaKey={key ?? undefined} {...schema} />
       </ScrollDirectionProvider>
     </ThemeProvider>
   );

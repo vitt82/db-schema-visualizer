@@ -9,7 +9,8 @@ export interface WebviewApi<StateType> {
 declare global {
   interface Window {
     EXTENSION_DEFAULT_CONFIG?: DefaultPageConfig;
-    vsCodeWebviewAPI: WebviewApi;
+    EXTENSION_PERSISTED_DATA?: Record<string, unknown>;
+    vsCodeWebviewAPI?: WebviewApi<unknown>;
   }
 }
 
