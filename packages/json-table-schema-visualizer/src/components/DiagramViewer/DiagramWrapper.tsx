@@ -21,7 +21,13 @@ interface DiagramWrapperProps {
 }
 
 const DiagramWrapper = ({ children }: DiagramWrapperProps) => {
-  const scaleBy = 1.02;
+  // Zoom multiplier per scroll step. Read from injected extension default config
+  // `window.EXTENSION_DEFAULT_CONFIG.zoomStep` (set via extension settings `prismaERDPreviewer.zoomStep`).
+  // Fallback to 1.06 for a snappier zoom by default.
+  // Values > 1.0 zoom faster (e.g. 1.06), values closer to 1.0 zoom slower (e.g. 1.02).
+  // Use a number between 1.01 and 2 as configured in package.json.
+  const configuredZoom = (window as any).EXTENSION_DEFAULT_CONFIG?.zoomStep;
+  const scaleBy = typeof configuredZoom === "number" && configuredZoom > 1 ? configuredZoom : 1.06;
   const { height: windowHeight, width: windowWidth } = useWindowSize();
   const { theme } = useThemeContext();
   const { scrollDirection } = useScrollDirectionContext();

@@ -5,4 +5,5 @@ export interface DefaultPageConfig {
   theme: Theme;
   scrollDirection: ScrollDirection;
   autoLayoutOnStructuralChange?: boolean;
+  zoomStep?: number;
 }

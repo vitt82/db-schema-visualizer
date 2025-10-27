@@ -45,11 +45,13 @@ export class ExtensionConfig {
     const autoLayout = this.config.get(
       ConfigKeys.autoLayoutOnStructuralChange,
     ) as boolean | undefined;
+    const zoomStep = this.config.get(ConfigKeys.zoomStep);
 
     return {
       theme,
       scrollDirection,
       autoLayoutOnStructuralChange: autoLayout ?? true,
+      zoomStep: typeof zoomStep === 'number' ? zoomStep : undefined,
     };
   }
 }

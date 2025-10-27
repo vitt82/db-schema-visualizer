@@ -56,6 +56,13 @@
             "To use light mode theme colors"
           ]
         },
+        "prismaERDPreviewer.zoomStep": {
+          "type": "number",
+          "default": 1.06,
+          "description": "Multiplier applied per scroll step when zooming. Values > 1.0 zoom faster (e.g. 1.06).",
+          "minimum": 1.01,
+          "maximum": 2
+        },
         "prismaERDPreviewer.scrollDirection": {
           "type": "string",
           "default": "up-out",
