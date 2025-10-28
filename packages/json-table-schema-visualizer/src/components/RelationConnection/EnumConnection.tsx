@@ -15,8 +15,9 @@ import { enumCoordsStore } from "@/stores/enumCoords";
 import { useRelationsColsY } from "@/hooks/relationConnection";
 import { useTableWidthStoredValue } from "@/hooks/tableWidthStore";
 import { useGetEnum } from "@/hooks/enums";
+import { useGetEnumMinWidth } from "@/hooks/enum";
 
-import { TABLE_HEADER_HEIGHT } from "@/constants/sizing";
+import { TABLE_HEADER_HEIGHT, TABLE_DEFAULT_MIN_WIDTH } from "@/constants/sizing";
 
 import type { XYPosition } from "@/types/positions";
 import { Position } from "@/types/positions";
@@ -56,7 +57,10 @@ const EnumConnection = ({
   const [sourceColY] = useRelationsColsY(fakeSource, fakeTarget);
 
   const sourceTableWidth = useTableWidthStoredValue(sourceTableName);
-  const targetWidth = useTableWidthStoredValue(enumName); // Use same hook, assume enum width is stored
+  
+  // Get enum object and compute its width
+  const enumObj = useGetEnum(enumName);
+  const targetWidth = enumObj ? useGetEnumMinWidth(enumObj) : TABLE_DEFAULT_MIN_WIDTH;
 
   // Event names for drag events
   const sourceTableDragEventName = computeTableDragEventName(sourceTableName);
@@ -108,6 +112,15 @@ const EnumConnection = ({
     const sourceCenter = sourceTableCoords.x + sourceTableWidth / 2;
     const targetCenter = targetEnumCoords.x + targetWidth / 2;
 
+    // eslint-disable-next-line no-console
+    console.debug("EnumConnection:", enumName, {
+      sourceCenter,
+      targetCenter,
+      sourceTableWidth,
+      targetWidth,
+      enumObj: enumObj?.name,
+    });
+
     if (targetCenter < sourceCenter) {
       // enum is left of table -> attach enum on RIGHT side
       resolvedTargetPosition = Position.Right;
@@ -115,12 +128,16 @@ const EnumConnection = ({
       // attach table on LEFT side
       resolvedSourcePosition = Position.Left;
       resolvedFinalSourceX = sourceTableCoords.x;
+      // eslint-disable-next-line no-console
+      console.debug("  → enum LEFT of table, using RIGHT anchor");
     } else if (targetCenter > sourceCenter) {
       // enum is right of table -> attach enum on LEFT side
       resolvedTargetPosition = Position.Left;
       resolvedFinalTargetX = targetEnumCoords.x;
       resolvedSourcePosition = Position.Right;
       resolvedFinalSourceX = sourceTableCoords.x + sourceTableWidth;
+      // eslint-disable-next-line no-console
+      console.debug("  → enum RIGHT of table, using LEFT anchor");
     }
   } catch (err) {
     // fallback to computed values on any error
@@ -133,10 +150,9 @@ const EnumConnection = ({
   // Ajustar el cálculo de targetY para conectar al centro del encabezado
   // targetEnumCoords are top-left; default to header center for side connections
   let targetY = targetEnumCoords.y + TABLE_HEADER_HEIGHT / 2;
-  const enumObj = useGetEnum(enumName);
   // when connecting from left or right, anchor vertically to header center
   if (
-    (targetPosition === Position.Left || targetPosition === Position.Right) &&
+    (resolvedTargetPosition === Position.Left || resolvedTargetPosition === Position.Right) &&
     enumObj != null
   ) {
     // top-left + header offset
