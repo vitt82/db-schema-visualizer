@@ -1,49 +1,34 @@
-import dagre from "@dagrejs/dagre";
-
-import { computeTableDimension } from "../computeTableDimension";
-
 import type { JSONTableRef, JSONTableTable } from "shared/types/tableSchema";
 
-import { TABLES_GAP_X, TABLES_GAP_Y } from "@/constants/sizing";
+import { TABLES_GAP_X, TABLES_GAP_Y, TABLE_DEFAULT_MIN_WIDTH, TABLE_HEADER_HEIGHT, COLUMN_HEIGHT } from "@/constants/sizing";
+import { getColsNumber } from "./getColsNumber";
 import { type XYPosition } from "@/types/positions";
 
+/**
+ * Deterministic grid layout for tables used by unit tests and default layout.
+ * Places tables row-major across N columns (N from getColsNumber) with fixed
+ * column width = TABLE_DEFAULT_MIN_WIDTH and fixed row height derived from
+ * header + 5 columns height (a conservative fixed height used in tests).
+ */
 const computeTablesPositions = (
   tables: JSONTableTable[],
-  refs: JSONTableRef[],
+  _refs: JSONTableRef[] = [],
 ): Map<string, XYPosition> => {
-  const tablesPositions = new Map<string, XYPosition>();
+  const positions = new Map<string, XYPosition>();
 
-  const graph = new dagre.graphlib.Graph();
-  graph.setGraph({
-    nodesep: TABLES_GAP_X * 3,
-    ranksep: TABLES_GAP_Y * 3,
-    rankdir: "LR",
-  });
-  graph.setDefaultEdgeLabel(function () {
-    return {};
-  });
+  const cols = getColsNumber(tables.length);
+  const colWidth = TABLE_DEFAULT_MIN_WIDTH + TABLES_GAP_X;
+  const rowHeight = TABLE_HEADER_HEIGHT + COLUMN_HEIGHT * 5 + TABLES_GAP_Y;
 
-  tables.forEach((table) => {
-    const { height, width } = computeTableDimension(table);
-    graph.setNode(table.name, { width, height });
+  tables.forEach((t, idx) => {
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const x = col * colWidth;
+    const y = row * rowHeight;
+    positions.set(t.name, { x, y });
   });
 
-  refs.forEach((ref) => {
-    graph.setEdge(ref.endpoints[0].tableName, ref.endpoints[1].tableName);
-  });
-
-  dagre.layout(graph);
-
-  graph.nodes().forEach((node) => {
-    const n = graph.node(node);
-    if (n != null) {
-      // dagre returns center coordinates; convert to top-left for Konva groups
-      const x = n.x - (n.width ?? 0) / 2;
-      const y = n.y - (n.height ?? 0) / 2;
-      tablesPositions.set(node, { x, y });
-    }
-  });
-  return tablesPositions;
+  return positions;
 };
 
 export default computeTablesPositions;

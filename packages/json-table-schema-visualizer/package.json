@@ -24,6 +24,7 @@
     "@storybook/react-vite": "^8.0.4",
     "@storybook/test": "^8.0.4",
     "autoprefixer": "^10.4.19",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.38",
     "prop-types": "^15.8.1",
     "storybook": "^8.0.4",

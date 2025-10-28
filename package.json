@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
+  "jest-environment-jsdom": "^29.7.0",
     "@typescript-eslint/eslint-plugin": "^6.4.0",
     "eslint": "^8.0.1",
     "eslint-config-prettier": "^9.1.0",

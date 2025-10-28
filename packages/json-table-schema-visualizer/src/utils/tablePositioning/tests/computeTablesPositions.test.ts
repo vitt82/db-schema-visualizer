@@ -26,13 +26,13 @@ describe("compute tables positions", () => {
     ]);
 
     expect(tablesPositions).toEqual(
-      new Map<string, [number, number]>([
-        ["follows", [0, 0]],
-        ["users", [TABLE_WIDTH_WITH_GAP, 0]],
-        ["bookings", [TABLE_WIDTH_WITH_GAP * 2, 0]],
+      new Map<string, { x: number; y: number }>([
+        ["follows", { x: 0, y: 0 }],
+        ["users", { x: TABLE_WIDTH_WITH_GAP, y: 0 }],
+        ["bookings", { x: TABLE_WIDTH_WITH_GAP * 2, y: 0 }],
         [
           "bookings_1",
-          [0, TABLE_HEADER_HEIGHT + COLUMN_HEIGHT * 5 + TABLES_GAP_Y],
+          { x: 0, y: TABLE_HEADER_HEIGHT + COLUMN_HEIGHT * 5 + TABLES_GAP_Y },
         ],
       ]),
     );
@@ -47,11 +47,11 @@ describe("compute tables positions", () => {
     ]);
 
     expect(tablesPositions).toEqual(
-      new Map<string, [number, number]>([
-        ["follows", [0, 0]],
-        ["users", [TABLE_WIDTH_WITH_GAP, 0]],
-        ["bookings", [TABLE_WIDTH_WITH_GAP * 2, 0]],
-        ["bookings_1", [TABLE_WIDTH_WITH_GAP * 3, 0]],
+      new Map<string, { x: number; y: number }>([
+        ["follows", { x: 0, y: 0 }],
+        ["users", { x: TABLE_WIDTH_WITH_GAP, y: 0 }],
+        ["bookings", { x: TABLE_WIDTH_WITH_GAP * 2, y: 0 }],
+        ["bookings_1", { x: TABLE_WIDTH_WITH_GAP * 3, y: 0 }],
       ]),
     );
   });

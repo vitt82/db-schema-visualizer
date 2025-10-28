@@ -7,7 +7,7 @@ import { TableDetailLevel } from "@/types/tableDetailLevel";
 
 export const computeColIndexes = (
   tables: JSONTableTable[],
-  detailLevel: TableDetailLevel,
+  detailLevel: TableDetailLevel = TableDetailLevel.FullDetails,
 ): ColsIndexesMap => {
   if (detailLevel === TableDetailLevel.HeaderOnly) {
     return {};

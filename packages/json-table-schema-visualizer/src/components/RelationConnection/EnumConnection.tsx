@@ -94,7 +94,41 @@ const EnumConnection = ({
       targetX: targetEnumCoords.x,
     });
 
-  const sourceXY = { x: finalSourceX, y: sourceColY + sourceTableCoords.y };
+  // Force-correct anchoring for enums: sometimes computed anchors pick the
+  // left side of the enum even when the enum is placed on the left of the
+  // source table (which would make the line go behind the enum). To avoid
+  // that visual glitch, prefer anchoring the enum on its right side when its
+  // center is to the left of the table center (and viceversa).
+  let resolvedSourcePosition = sourcePosition;
+  let resolvedTargetPosition = targetPosition;
+  let resolvedFinalSourceX = finalSourceX;
+  let resolvedFinalTargetX = finalTargetX;
+
+  try {
+    const sourceCenter = sourceTableCoords.x + sourceTableWidth / 2;
+    const targetCenter = targetEnumCoords.x + targetWidth / 2;
+
+    if (targetCenter < sourceCenter) {
+      // enum is left of table -> attach enum on RIGHT side
+      resolvedTargetPosition = Position.Right;
+      resolvedFinalTargetX = targetEnumCoords.x + targetWidth;
+      // attach table on LEFT side
+      resolvedSourcePosition = Position.Left;
+      resolvedFinalSourceX = sourceTableCoords.x;
+    } else if (targetCenter > sourceCenter) {
+      // enum is right of table -> attach enum on LEFT side
+      resolvedTargetPosition = Position.Left;
+      resolvedFinalTargetX = targetEnumCoords.x;
+      resolvedSourcePosition = Position.Right;
+      resolvedFinalSourceX = sourceTableCoords.x + sourceTableWidth;
+    }
+  } catch (err) {
+    // fallback to computed values on any error
+    // eslint-disable-next-line no-console
+    console.debug("EnumConnection: failed to resolve centers", err);
+  }
+
+  const sourceXY = { x: resolvedFinalSourceX, y: sourceColY + sourceTableCoords.y };
 
   // Ajustar el cálculo de targetY para conectar al centro del encabezado
   // targetEnumCoords are top-left; default to header center for side connections
@@ -109,15 +143,15 @@ const EnumConnection = ({
     targetY = targetEnumCoords.y + TABLE_HEADER_HEIGHT / 2; // Conectar al centro del encabezado
   }
 
-  const targetXY = { x: finalTargetX, y: targetY };
+  const targetXY = { x: resolvedFinalTargetX, y: targetY };
 
   const linePath = useMemo(
     () =>
       computeConnectionPathWithSymbols({
         targetXY,
         sourceXY,
-        sourcePosition,
-        targetPosition,
+        sourcePosition: resolvedSourcePosition,
+        targetPosition: resolvedTargetPosition,
         relationSource: "?",
         relationTarget: "?",
       }),
@@ -126,8 +160,8 @@ const EnumConnection = ({
       sourceXY.y,
       targetXY.x,
       targetXY.y,
-      sourcePosition,
-      targetPosition,
+      resolvedSourcePosition,
+      resolvedTargetPosition,
     ],
   );
 
