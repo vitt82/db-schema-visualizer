@@ -76,7 +76,7 @@ const Column = ({
             height={COLUMN_HEIGHT}
           />
 
-          {note != null || isEnum ? (
+          {note != null ? (
             <FieldDetails note={note ?? ""} enumName={type} />
           ) : null}
         </>

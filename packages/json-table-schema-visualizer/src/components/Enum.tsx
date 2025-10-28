@@ -88,7 +88,7 @@ const Enum = ({ name, values }: EnumProps) => {
         x={PADDINGS.md}
         y={PADDINGS.sm}
         fontStyle="bold"
-        text={`Enum ${name}`}
+        text={name}
         fill={themeColors.tableHeader?.fg ?? themeColors.white}
       />
 
