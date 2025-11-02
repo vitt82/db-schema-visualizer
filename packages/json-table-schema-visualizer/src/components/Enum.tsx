@@ -14,6 +14,7 @@ import { useThemeColors } from "@/hooks/theme";
 import eventEmitter from "@/events-emitter";
 import { enumCoordsStore } from "@/stores/enumCoords";
 import { computeEnumDragEventName } from "@/utils/eventName";
+import { tableGroupsStore } from "@/stores/tableGroups";
 
 interface EnumProps extends JSONTableEnum {}
 
@@ -51,7 +52,11 @@ const Enum = ({ name, values }: EnumProps) => {
   return (
     <Group
       ref={enumRef}
+      name={`enum-${name}`}
       draggable
+      onDragStart={() => {
+        eventEmitter.emit("enum:dragstart", name);
+      }}
       onDragMove={(e) => {
         const node = e.currentTarget as Konva.Group;
         const coords = { x: node.x(), y: node.y() };
@@ -68,6 +73,50 @@ const Enum = ({ name, values }: EnumProps) => {
         } catch (err) {
           // eslint-disable-next-line no-console
           console.error("enum: failed to save coords", err);
+        }
+      }}
+      onDragEnd={(e) => {
+        const node = e.currentTarget as Konva.Group;
+        const enumCenterX = node.x() + width / 2;
+        const enumCenterY = node.y() + enumHeight / 2;
+
+        // Check if enum is being dropped into a group
+        const groups = tableGroupsStore.getGroups();
+        let foundGroup: string | null = null;
+
+        for (const group of groups) {
+          const isInGroup =
+            enumCenterX >= group.x &&
+            enumCenterX <= group.x + group.width &&
+            enumCenterY >= group.y &&
+            enumCenterY <= group.y + group.height;
+
+          if (isInGroup) {
+            foundGroup = group.id;
+            break;
+          }
+        }
+
+        // Remove from old group if any
+        const currentGroups = groups.filter((g) =>
+          g.enumNames?.includes(name)
+        );
+        for (const oldGroup of currentGroups) {
+          if (oldGroup.id !== foundGroup) {
+            console.log(`Removing enum ${name} from group ${oldGroup.id}`);
+            tableGroupsStore.removeEnumFromGroup(oldGroup.id, name);
+          }
+        }
+
+        // Add to new group if found
+        if (foundGroup != null) {
+          const alreadyInGroup = groups.find(
+            (g) => g.id === foundGroup && g.enumNames?.includes(name)
+          );
+          if (alreadyInGroup == null) {
+            console.log(`Adding enum ${name} to group ${foundGroup}`);
+            tableGroupsStore.addEnumToGroup(foundGroup, name);
+          }
         }
       }}
       onClick={() => {

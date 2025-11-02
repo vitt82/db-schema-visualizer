@@ -5,11 +5,13 @@ import type IndexColumn from "@dbml/core/types/model_structure/indexColumn";
 import type Index from "@dbml/core/types/model_structure/indexes";
 import type Table from "@dbml/core/types/model_structure/table";
 import type { PartialRequired } from "./utils";
+import type { JSONTableGroup } from "./tableGroup";
 
 export interface JSONTableSchema {
   refs: JSONTableRef[];
   enums: JSONTableEnum[];
   tables: JSONTableTable[];
+  groups?: JSONTableGroup[];
 }
 
 export interface JSONTableEnum

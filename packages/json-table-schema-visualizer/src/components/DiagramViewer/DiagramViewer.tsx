@@ -1,3 +1,4 @@
+import type { JSONTableGroup } from "shared/types/tableGroup";
 import {
   type JSONTableEnum,
   type JSONTableRef,
@@ -5,25 +6,26 @@ import {
 } from "shared/types/tableSchema";
 
 import EmptyTableMessage from "../Messages/EmptyTableMessage";
-
-import Tables from "./Tables";
+import DiagramWrapper from "./DiagramWrapper";
 import Enums from "./Enums";
 import EnumConnections from "./EnumConnections";
 import RelationsConnections from "./Connections";
-import DiagramWrapper from "./DiagramWrapper";
+import TableGroups from "./TableGroups";
+import Tables from "./Tables";
 
-import TablesPositionsProvider from "@/providers/TablesPositionsProvider";
 import MainProviders from "@/providers/MainProviders";
 import TableLevelDetailProvider from "@/providers/TableDetailLevelProvider";
+import TablesPositionsProvider from "@/providers/TablesPositionsProvider";
 
 interface DiagramViewerProps {
   tables: JSONTableTable[];
   refs: JSONTableRef[];
   enums: JSONTableEnum[];
+  groups?: JSONTableGroup[];
   schemaKey?: string | null;
 }
 
-const DiagramViewer = ({ refs, tables, enums, schemaKey }: DiagramViewerProps) => {
+const DiagramViewer = ({ refs, tables, enums, groups = [], schemaKey }: DiagramViewerProps) => {
   if (tables.length === 0) {
     return <EmptyTableMessage />;
   }
@@ -48,6 +50,7 @@ const DiagramViewer = ({ refs, tables, enums, schemaKey }: DiagramViewerProps) =
       <TablesPositionsProvider tables={tables} refs={refs} enums={enums}>
         <MainProviders tables={tables} enums={enums}>
           <DiagramWrapper>
+            <TableGroups groups={groups} />
             <RelationsConnections refs={refs} />
             <EnumConnections tables={tables} enums={enums} />
 

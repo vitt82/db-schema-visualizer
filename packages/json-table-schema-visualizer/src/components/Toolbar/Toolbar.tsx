@@ -5,6 +5,7 @@ import DetailLevelToggle from "./DetailLevelToggle/DetailLevelToggle";
 import FitToViewButton from "./FitToView/FitToView";
 import RefreshButton from "./Refresh/RefreshButton";
 import CustomArrangeButton from "./CustomArrange/CustomArrange";
+import AddGroupButton from "./AddGroup/AddGroupButton";
 
 const Toolbar = ({ onFitToView }: { onFitToView: () => void }) => {
   return (
@@ -13,6 +14,7 @@ const Toolbar = ({ onFitToView }: { onFitToView: () => void }) => {
       <FitToViewButton onClick={onFitToView} />
       <RefreshButton />
       <CustomArrangeButton />
+      <AddGroupButton />
       <hr className="w-px h-6 mx-4 my-1 bg-gray-300" />
       <ThemeToggler />
     </div>

@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+
 import { type JSONTableSchema } from "shared/types/tableSchema";
+
 import { tableCoordsStore } from "json-table-schema-visualizer/src/stores/tableCoords";
 import { stageStateStore } from "json-table-schema-visualizer/src/stores/stagesState";
 import { detailLevelStore } from "json-table-schema-visualizer/src/stores/detailLevelStore";
 import { enumCoordsStore } from "json-table-schema-visualizer/src/stores/enumCoords";
+import { tableGroupsStore } from "json-table-schema-visualizer/src/stores/tableGroups";
 
 import { type SetSchemaCommandPayload, WebviewCommand } from "../../extension/types/webviewCommand";
 
@@ -35,6 +38,11 @@ export const useSchema = (): {
         message.payload.tables,
         message.payload.refs,
         message.payload.enums ?? [],
+      );
+      // switch table groups store (keep groups per schema key)
+      tableGroupsStore.switchTo(
+        message.key,
+        message.payload.groups ?? [],
       );
       stageStateStore.switchTo(message.key);
       detailLevelStore.switchTo(message.key);
@@ -98,6 +106,8 @@ export const useSchema = (): {
       tableCoordsStore.saveCurrentStore();
       // save current enums positions as well
       enumCoordsStore.saveCurrentStore();
+      // save current groups as well
+      tableGroupsStore.saveCurrentStore();
     };
   }, []);
 
