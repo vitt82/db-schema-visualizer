@@ -62,6 +62,7 @@ class TableGroupsStore extends PersistableStore<Array<[string, JSONTableGroup & 
 
   public saveCurrentStore(): void {
     const storeValue = Array.from(this.groups);
+    console.log("[TableGroupsStore] saveCurrentStore - key:", this.currentStoreKey, "groups count:", storeValue.length);
     this.persist(this.currentStoreKey, storeValue);
   }
 
@@ -69,16 +70,22 @@ class TableGroupsStore extends PersistableStore<Array<[string, JSONTableGroup & 
     this.saveCurrentStore();
 
     this.currentStoreKey = newStoreKey;
+    console.log("[TableGroupsStore] switchTo - newStoreKey:", newStoreKey);
+    
     const recoveredStore = this.retrieve(this.currentStoreKey) as Array<
       [string, JSONTableGroup & GroupDimensions]
     >;
     
+    console.log("[TableGroupsStore] switchTo - recoveredStore:", recoveredStore);
+    
     if (recoveredStore === null || !Array.isArray(recoveredStore)) {
+      console.log("[TableGroupsStore] switchTo - No persisted data, initializing with:", initialGroups);
       this.initGroups(initialGroups);
       return;
     }
 
     this.groups = new Map<string, JSONTableGroup & GroupDimensions>(recoveredStore);
+    console.log("[TableGroupsStore] switchTo - Loaded groups from storage:", Array.from(this.groups.keys()));
   }
 
   public setGroupDimensions(id: string, dimensions: Partial<GroupDimensions>): void {

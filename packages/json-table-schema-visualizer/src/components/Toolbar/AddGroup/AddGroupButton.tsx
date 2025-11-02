@@ -10,7 +10,6 @@ const AddGroupButton = () => {
     const newGroup = {
       id: groupId,
       name: `Grupo ${tableGroupsStore.getAllGroups().size + 1}`,
-      color: "#FF9800",
       tableNames: [],
       x: 100,
       y: 100,
@@ -18,6 +17,7 @@ const AddGroupButton = () => {
       height: 400,
     };
 
+    console.log("[AddGroupButton] Creating new group:", newGroup);
     tableGroupsStore.createGroup(newGroup);
   };
 

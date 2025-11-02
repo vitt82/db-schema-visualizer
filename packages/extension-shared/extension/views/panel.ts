@@ -170,6 +170,9 @@ export class MainPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
+        enableCommandUris: true,
+        // Allow modals (prompt, confirm, alert) in webview
+        enableForms: true,
       },
     );
 

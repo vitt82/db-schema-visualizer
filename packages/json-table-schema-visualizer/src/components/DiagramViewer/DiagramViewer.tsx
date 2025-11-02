@@ -12,10 +12,12 @@ import EnumConnections from "./EnumConnections";
 import RelationsConnections from "./Connections";
 import TableGroups from "./TableGroups";
 import Tables from "./Tables";
+import RenameGroupModal from "../Modals/RenameGroupModal";
 
 import MainProviders from "@/providers/MainProviders";
 import TableLevelDetailProvider from "@/providers/TableDetailLevelProvider";
 import TablesPositionsProvider from "@/providers/TablesPositionsProvider";
+import { RenameGroupProvider } from "@/contexts/RenameGroupContext";
 
 interface DiagramViewerProps {
   tables: JSONTableTable[];
@@ -46,20 +48,23 @@ const DiagramViewer = ({ refs, tables, enums, groups = [], schemaKey }: DiagramV
   }
 
   return (
-    <TableLevelDetailProvider>
-      <TablesPositionsProvider tables={tables} refs={refs} enums={enums}>
-        <MainProviders tables={tables} enums={enums}>
-          <DiagramWrapper>
-            <TableGroups groups={groups} />
-            <RelationsConnections refs={refs} />
-            <EnumConnections tables={tables} enums={enums} />
+    <RenameGroupProvider>
+      <TableLevelDetailProvider>
+        <TablesPositionsProvider tables={tables} refs={refs} enums={enums}>
+          <MainProviders tables={tables} enums={enums}>
+            <DiagramWrapper>
+              <TableGroups groups={groups} />
+              <RelationsConnections refs={refs} />
+              <EnumConnections tables={tables} enums={enums} />
 
-            <Tables tables={tables} />
-            <Enums enums={enums} />
-          </DiagramWrapper>
-        </MainProviders>
-      </TablesPositionsProvider>
-    </TableLevelDetailProvider>
+              <Tables tables={tables} />
+              <Enums enums={enums} />
+            </DiagramWrapper>
+            <RenameGroupModal />
+          </MainProviders>
+        </TablesPositionsProvider>
+      </TableLevelDetailProvider>
+    </RenameGroupProvider>
   );
 };
 
