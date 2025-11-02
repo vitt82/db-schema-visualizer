@@ -118,6 +118,7 @@
     "vite-tsconfig-paths": "^4.3.2"
   },
   "dependencies": {
+    "@tomjs/vite-plugin-vscode": "^2.2.0",
     "json-table-schema-visualizer": "1.0.0",
     "prisma-to-json-table-schema": "0.0.1",
     "extension-shared": "file:../extension-shared",
