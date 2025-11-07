@@ -77,8 +77,12 @@ const Enum = ({ name, values }: EnumProps) => {
       }}
       onDragEnd={(e) => {
         const node = e.currentTarget as Konva.Group;
-        const enumCenterX = node.x() + width / 2;
-        const enumCenterY = node.y() + enumHeight / 2;
+        const enumPosX = node.x();
+        const enumPosY = node.y();
+        const enumCenterX = enumPosX + width / 2;
+        const enumCenterY = enumPosY + enumHeight / 2;
+
+        console.log(`[Enum] onDragEnd - enum "${name}" at (${enumPosX}, ${enumPosY}), center: (${enumCenterX}, ${enumCenterY})`);
 
         // Check if enum is being dropped into a group
         const groups = tableGroupsStore.getGroups();
@@ -91,8 +95,11 @@ const Enum = ({ name, values }: EnumProps) => {
             enumCenterY >= group.y &&
             enumCenterY <= group.y + group.height;
 
+          console.log(`[Enum] Checking group "${group.name}" (${group.x}, ${group.y}, ${group.width}x${group.height}): ${isInGroup}`);
+
           if (isInGroup) {
             foundGroup = group.id;
+            console.log(`[Enum] Enum "${name}" found in group "${group.name}"`);
             break;
           }
         }
@@ -103,7 +110,7 @@ const Enum = ({ name, values }: EnumProps) => {
         );
         for (const oldGroup of currentGroups) {
           if (oldGroup.id !== foundGroup) {
-            console.log(`Removing enum ${name} from group ${oldGroup.id}`);
+            console.log(`[Enum] Removing enum "${name}" from old group "${oldGroup.name}"`);
             tableGroupsStore.removeEnumFromGroup(oldGroup.id, name);
           }
         }
@@ -114,8 +121,18 @@ const Enum = ({ name, values }: EnumProps) => {
             (g) => g.id === foundGroup && g.enumNames?.includes(name)
           );
           if (alreadyInGroup == null) {
-            console.log(`Adding enum ${name} to group ${foundGroup}`);
+            console.log(`[Enum] Adding enum "${name}" to group`);
             tableGroupsStore.addEnumToGroup(foundGroup, name);
+          } else {
+            console.log(`[Enum] Enum "${name}" already in group`);
+          }
+        } else {
+          console.log(`[Enum] Enum "${name}" not in any group, removing from all groups if any`);
+          // Remove from all groups if not in any group
+          for (const group of currentGroups) {
+            if (group.enumNames != null && group.enumNames.includes(name)) {
+              tableGroupsStore.removeEnumFromGroup(group.id, name);
+            }
           }
         }
       }}
