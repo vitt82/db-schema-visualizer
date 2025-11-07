@@ -36,6 +36,8 @@ export class WebviewHelper {
     persistedData?: Record<string, unknown>,
   ): string {
     const persisted = persistedData ?? {};
+    console.log("[WebviewHelper.injectDefaultConfig] Injecting persisted data keys:", Object.keys(persisted));
+    console.log("[WebviewHelper.injectDefaultConfig] Persisted data content:", JSON.stringify(persisted).substring(0, 500));
     return html.replace(
       WEBVIEW_HTML_MARKER_FOR_DEFAULT_CONFIG,
       `
@@ -97,15 +99,16 @@ export class WebviewHelper {
 
   public static setupWebviewHooks(
     webview: Webview,
-    extensionConfig: ExtensionConfig,
+    extConfig: ExtensionConfig,
     disposables: Disposable[],
-    onRefreshSchema?: () => void,
+    refreshCurrentSchema: () => void,
   ): void {
+    console.log("[WebviewHelper] Setting up webview hooks - registering onDidReceiveMessage");
     webview.onDidReceiveMessage(
       async (message: WebviewPostMessage) => {
         const command = message.command;
         const textMessage = message.message;
-        console.log("Received message", command, textMessage);
+        console.log("[WebviewHelper] onDidReceiveMessage triggered - command:", command, "payload length:", textMessage?.length ?? 0);
 
         // Handle file persistence commands directly here so we can use workspace.fs
         if (command === WebviewCommand.FILE_WRITE) {
@@ -177,8 +180,8 @@ export class WebviewHelper {
         WebviewHelper.handleWebviewMessage(
           command,
           textMessage,
-          extensionConfig,
-          onRefreshSchema,
+          extConfig,
+          refreshCurrentSchema,
         );
       },
       undefined,

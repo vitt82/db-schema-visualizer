@@ -31,6 +31,7 @@ export class MainPanel {
   private readonly _disposables: Disposable[] = [];
   // to add debouncing on diagram update after a file change
   private _lastTimeout: NodeJS.Timeout | null = null;
+  private readonly _readyPromise: Promise<void>;
   public static parseCode: (code: string) => JSONTableSchema;
   public static fileExt: string;
   public static lastDocument: TextDocument | undefined;
@@ -51,6 +52,21 @@ export class MainPanel {
       this._disposables,
     );
 
+    // Save state when the webview visibility changes (e.g., tab switched or hidden)
+    this._panel.onDidChangeViewState(
+      (event) => {
+        if (!event.webviewPanel.visible) {
+          console.log("[MainPanel] Webview hidden, requesting save from webview");
+          void webview.postMessage({
+            command: "SAVE_AND_CLOSE",
+            message: "save all stores before hiding",
+          });
+        }
+      },
+      null,
+      this._disposables,
+    );
+
     const extensionConfig = new ExtensionConfig(extensionConfigSession);
     const defaultPageConfig = extensionConfig.getDefaultPageConfig();
 
@@ -59,7 +75,7 @@ export class MainPanel {
     const disposables = this._disposables;
     const extConfig = extensionConfig;
 
-    void (async () => {
+    const setupWebviewWithPersistedData = async (): Promise<void> => {
       const persistedData: Record<string, unknown> = {};
       try {
         const wsFolder = workspace.workspaceFolders?.[0]?.uri;
@@ -68,21 +84,40 @@ export class MainPanel {
           try {
             const entries = await workspace.fs.readDirectory(dbmlDir);
             console.log("[MainPanel] Found .DBML directory with entries:", entries.length);
-            for (const [name] of entries) {
-              if (name.endsWith('.json')) {
-                try {
-                  const fileUri = Uri.joinPath(dbmlDir, name);
-                  const data = await workspace.fs.readFile(fileUri);
-                  const text = new TextDecoder().decode(data);
-                  const key = name.replace(/\.json$/, '').replace(/__/g, ':');
-                  persistedData[key] = JSON.parse(text);
-                  console.log("[MainPanel] Loaded persisted data - file:", name, "key:", key, "entries:", Array.isArray(persistedData[key]) ? (persistedData[key] as unknown[]).length : "not array");
-                } catch (e) {
-                  // ignore file parse errors
-                  console.error('[MainPanel] Failed to read persisted file', name, e);
+            
+            // Helper function to recursively read files
+            const readFilesRecursively = async (dir: Uri, prefix: string = ""): Promise<void> => {
+              try {
+                const dirEntries = await workspace.fs.readDirectory(dir);
+                for (const [name, type] of dirEntries) {
+                  if (type === 1) {
+                    // It's a file
+                    if (name.endsWith('.json')) {
+                      try {
+                        const fileUri = Uri.joinPath(dir, name);
+                        const data = await workspace.fs.readFile(fileUri);
+                        const text = new TextDecoder().decode(data);
+                        // Decode filename back to original key
+                        const keyUnescaped = decodeURIComponent(name.replace(/\.json$/, ''));
+                        persistedData[keyUnescaped] = JSON.parse(text);
+                        console.log("[MainPanel] Loaded persisted data - file:", name, "key:", keyUnescaped, "entries:", Array.isArray(persistedData[keyUnescaped]) ? (persistedData[keyUnescaped] as unknown[]).length : "not array");
+                      } catch (e) {
+                        // ignore file parse errors
+                        console.error('[MainPanel] Failed to read persisted file', name, e);
+                      }
+                    }
+                  } else if (type === 2) {
+                    // It's a directory - recurse
+                    const subDir = Uri.joinPath(dir, name);
+                    await readFilesRecursively(subDir, prefix + name + "/");
+                  }
                 }
+              } catch (err) {
+                console.warn("[MainPanel] Error reading directory:", err);
               }
-            }
+            };
+            
+            await readFilesRecursively(dbmlDir);
           } catch {
             // no .DBML folder yet
             console.log("[MainPanel] No .DBML directory found");
@@ -93,6 +128,36 @@ export class MainPanel {
       }
 
       console.log("[MainPanel] Total persisted keys to inject:", Object.keys(persistedData).length, "keys:", Object.keys(persistedData));
+
+      // If we have legacy groups saved under 'tableGroups:none' but there is a
+      // file-specific key missing for the currently active document, attempt a
+      // one-time migration: write a new .DBML file for the document-specific
+      // key and add it to the persistedData object so the webview will see it.
+      try {
+        const activeDoc = window.activeTextEditor?.document;
+        const wsFolderForMigration = workspace.workspaceFolders?.[0]?.uri;
+        if (activeDoc != null && Object.prototype.hasOwnProperty.call(persistedData, "tableGroups:none") && wsFolderForMigration != null) {
+          const docKey = `tableGroups:${activeDoc.uri.toString()}`;
+          if (!Object.prototype.hasOwnProperty.call(persistedData, docKey)) {
+            console.log("[MainPanel] Migrating legacy tableGroups:none to document key:", docKey);
+            const legacy = persistedData["tableGroups:none"];
+            // persist new file on disk using the same filename escaping logic
+            const filename = encodeURIComponent(docKey) + ".json";
+            const fileUri = Uri.joinPath(wsFolderForMigration, ".DBML", filename);
+            try {
+              const content = new TextEncoder().encode(JSON.stringify(legacy, null, 2));
+              await workspace.fs.writeFile(fileUri, content);
+              // inject migrated value into persistedData so webview receives it
+              persistedData[docKey] = legacy;
+              console.log("[MainPanel] Migration successful, wrote file:", filename);
+            } catch (e) {
+              console.error('[MainPanel] Migration: failed to write migrated file', e);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[MainPanel] Migration check failed', e);
+      }
 
       const html = WebviewHelper.setupHtml(
         webview,
@@ -109,7 +174,15 @@ export class MainPanel {
         disposables,
         MainPanel.refreshCurrentSchema,
       );
-    })();
+    };
+
+    this._readyPromise = setupWebviewWithPersistedData().catch((error) => {
+      console.error("[MainPanel] Failed to setup webview with persisted data", error);
+    });
+  }
+
+  public get ready(): Promise<void> {
+    return this._readyPromise;
   }
 
   /**
@@ -124,7 +197,7 @@ export class MainPanel {
 
         if (MainPanel.currentPanel !== undefined) {
           MainPanel.currentPanel._lastTimeout = setTimeout(() => {
-            MainPanel.publishSchema(event.document);
+            void MainPanel.publishSchema(event.document);
           }, DIAGRAM_UPDATER_DEBOUNCE_TIME);
         }
       }
@@ -198,7 +271,7 @@ export class MainPanel {
     );
     MainPanel.registerDiagramUpdaterOnfFileChange();
 
-    MainPanel.publishSchema(editor.document);
+  void MainPanel.publishSchema(editor.document);
   }
 
   static getCurrentEditor(): TextEditor | undefined {
@@ -212,7 +285,7 @@ export class MainPanel {
     return editor;
   }
 
-  static publishSchema = (document: TextDocument): void => {
+  static publishSchema = async (document: TextDocument): Promise<void> => {
     const code = document.getText();
     try {
       const schema = MainPanel.parseCode(code);
@@ -223,17 +296,19 @@ export class MainPanel {
       // Debug log so extension host shows when we publish schema
       console.log("MainPanel.publishSchema: publishing schema for", document.uri.toString());
 
-      // Post the schema to the webview if present
-      // Use MainPanel.currentPanel explicitly to avoid issues with `this` binding
-      if (MainPanel.currentPanel?._panel) {
-        MainPanel.currentPanel._panel.webview.postMessage({
-          type: "setSchema",
-          payload: schema,
-          key: document.uri.toString(),
-        });
-      } else {
+      const panel = MainPanel.currentPanel;
+      if (panel == null) {
         console.warn("MainPanel.publishSchema: no currentPanel available to post schema");
+        return;
       }
+
+      await panel.ready;
+
+      await panel._panel.webview.postMessage({
+        type: "setSchema",
+        payload: schema,
+        key: document.uri.toString(),
+      });
 
       MainPanel.diagnosticCollection.clear();
     } catch (error) {
@@ -262,13 +337,13 @@ export class MainPanel {
   static refreshCurrentSchema = (): void => {
     const editor = MainPanel.getCurrentEditor();
     if (editor != null) {
-      MainPanel.publishSchema(editor.document);
+      void MainPanel.publishSchema(editor.document);
       return;
     }
 
     // fallback to last published document if any
     if (MainPanel.lastDocument != null) {
-      MainPanel.publishSchema(MainPanel.lastDocument);
+      void MainPanel.publishSchema(MainPanel.lastDocument);
       return;
     }
 
@@ -295,22 +370,38 @@ export class MainPanel {
       if (wsFolder !== undefined) {
         const dbmlDir = Uri.joinPath(wsFolder, ".DBML");
         try {
-          const entries = await workspace.fs.readDirectory(dbmlDir);
-          console.log("[MainPanel.reloadPersistedData] Found .DBML directory with entries:", entries.length);
-          for (const [name] of entries) {
-            if (name.endsWith('.json')) {
-              try {
-                const fileUri = Uri.joinPath(dbmlDir, name);
-                const data = await workspace.fs.readFile(fileUri);
-                const text = new TextDecoder().decode(data);
-                const key = name.replace(/\.json$/, '').replace(/__/g, ':');
-                persistedData[key] = JSON.parse(text);
-                console.log("[MainPanel.reloadPersistedData] Loaded file:", name, "key:", key);
-              } catch (e) {
-                console.error('[MainPanel.reloadPersistedData] Failed to read file', name, e);
+          // Helper function to recursively read files
+          const readFilesRecursively = async (dir: Uri): Promise<void> => {
+            try {
+              const dirEntries = await workspace.fs.readDirectory(dir);
+              for (const [name, type] of dirEntries) {
+                if (type === 1) {
+                  // It's a file
+                  if (name.endsWith('.json')) {
+                    try {
+                      const fileUri = Uri.joinPath(dir, name);
+                      const data = await workspace.fs.readFile(fileUri);
+                      const text = new TextDecoder().decode(data);
+                      const key = decodeURIComponent(name.replace(/\.json$/, ''));
+                      persistedData[key] = JSON.parse(text);
+                      console.log("[MainPanel.reloadPersistedData] Loaded file:", name, "key:", key);
+                    } catch (e) {
+                      console.error('[MainPanel.reloadPersistedData] Failed to read file', name, e);
+                    }
+                  }
+                } else if (type === 2) {
+                  // It's a directory - recurse
+                  const subDir = Uri.joinPath(dir, name);
+                  await readFilesRecursively(subDir);
+                }
               }
+            } catch (err) {
+              console.warn("[MainPanel.reloadPersistedData] Error reading directory:", err);
             }
-          }
+          };
+
+          await readFilesRecursively(dbmlDir);
+          console.log("[MainPanel.reloadPersistedData] Found .DBML directory, read files recursively");
         } catch (err) {
           console.log("[MainPanel.reloadPersistedData] No .DBML directory found:", err);
           // eslint-disable-next-line @typescript-eslint/no-floating-promises

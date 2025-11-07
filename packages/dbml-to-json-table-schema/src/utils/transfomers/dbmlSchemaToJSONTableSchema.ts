@@ -7,11 +7,13 @@ import { createRelationalTalesMap } from "../createRelationalTalesMap";
 import { dbmlEnumToJSONTableEnum } from "./dbmlEnumToJSONTableEnum";
 import { dbmlRefToJSONTableRef } from "./dbmlRefToJSONTableRef";
 import { dbmlTableToJSONTableTable } from "./dbmlTableToJSONTableTable";
+import { dbmlTableGroupToJSONTableGroup } from "./dbmlTableGroupToJSONTableGroup";
 
 export const dbmlSchemaToJSONTableSchema = ({
   refs,
   enums,
   tables,
+  tableGroups = [],
 }: RawDatabase): JSONTableSchema => {
   const relationalFieldMap = createRelationalTalesMap(refs);
   const enumsMap = createEnumsSet(enums);
@@ -21,10 +23,14 @@ export const dbmlSchemaToJSONTableSchema = ({
   const jsonTableTables = tables.map((table) =>
     dbmlTableToJSONTableTable(table, relationalFieldMap, enumsMap),
   );
+  const jsonTableGroups = tableGroups.map((group, index) =>
+    dbmlTableGroupToJSONTableGroup(group, index),
+  );
 
   return {
     refs: jsonTableRefs,
     enums: jsonTableEnums,
     tables: jsonTableTables,
+    groups: jsonTableGroups,
   };
 };

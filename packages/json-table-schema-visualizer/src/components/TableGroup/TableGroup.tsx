@@ -24,6 +24,7 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
   const groupRef = useRef<Konva.Group>(null);
   const [position, setPosition] = useState({ x: group.x, y: group.y });
   const [dimensions, setDimensions] = useState({ width: group.width, height: group.height });
+  const latestDimensionsRef = useRef({ width: group.width, height: group.height });
   const [isResizing, setIsResizing] = useState(false);
   const [isHighlighted, setIsHighlighted] = useState(false);
   const lastPositionRef = useRef({ x: group.x, y: group.y });
@@ -35,6 +36,7 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
   useEffect(() => {
     setPosition({ x: group.x, y: group.y });
     setDimensions({ width: group.width, height: group.height });
+    latestDimensionsRef.current = { width: group.width, height: group.height };
     lastPositionRef.current = { x: group.x, y: group.y };
   }, [group.x, group.y, group.width, group.height]);
 
@@ -127,6 +129,9 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
     tableGroupsStore.setGroupDimensions(group.id, finalPos);
     tableGroupsStore.saveCurrentStore();
     tableCoordsStore.saveCurrentStore();
+
+    // Recompute group membership after moving the group
+    recomputeMembership();
   };
 
   const handleResizeMouseDown = (corner: "se" | "sw" | "ne" | "nw", e: Konva.KonvaEventObject<MouseEvent>): void => {
@@ -193,7 +198,9 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
         groupRef.current.y(newY);
       }
       
-      setDimensions({ width: newWidth, height: newHeight });
+  const nextDimensions = { width: newWidth, height: newHeight };
+  setDimensions(nextDimensions);
+  latestDimensionsRef.current = nextDimensions;
       stage.batchDraw();
     };
 
@@ -204,11 +211,12 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
         
         setPosition({ x: finalX, y: finalY });
         
+        const latest = latestDimensionsRef.current;
         tableGroupsStore.setGroupDimensions(group.id, {
           x: finalX,
           y: finalY,
-          width: dimensions.width,
-          height: dimensions.height,
+          width: latest.width,
+          height: latest.height,
         });
         tableGroupsStore.saveCurrentStore();
       }
@@ -219,6 +227,9 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
       
       stage.off("mousemove", handleMouseMove);
       stage.off("mouseup", handleMouseUp);
+
+      // Recompute membership after resizing
+      recomputeMembership();
     };
 
     stage.on("mousemove", handleMouseMove);
@@ -239,6 +250,58 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
   const backgroundColor = group.color ?? (themeColors.bg === "white" ? "#E3F2FD" : "#1A2332");
   const borderColor = group.color ?? (themeColors.bg === "white" ? "#2196F3" : "#42A5F5");
   const textColor = themeColors.bg === "white" ? "#000000" : "#FFFFFF";
+
+  // Helper: recompute tables and enums inside current group bounds and persist membership
+  const recomputeMembership = (): void => {
+    const stage = groupRef.current?.getStage();
+    if (stage == null || groupRef.current == null) return;
+
+    const { x, y } = groupRef.current.position();
+    const { width, height } = latestDimensionsRef.current;
+
+    // Determine tables inside
+    const newTableNames: string[] = [];
+    tableCoordsStore.getCurrentStoreValue().forEach((_pos, tableName) => {
+      const maybeNode = stage.find(`.table-${tableName}`)[0] as Konva.Group | undefined;
+      if (maybeNode == null) return;
+      const node = maybeNode;
+      const centerX = node.x() + node.width() / 2;
+      const centerY = node.y() + node.height() / 2;
+      const inside = centerX >= x && centerX <= x + width && centerY >= y && centerY <= y + height;
+      if (inside) newTableNames.push(tableName);
+    });
+
+    // Determine enums inside
+    const newEnumNames: string[] = [];
+    enumCoordsStore.getCurrentStoreValue().forEach((_pos, enumName) => {
+      const maybeNode = stage.find(`.enum-${enumName}`)[0] as Konva.Group | undefined;
+      if (maybeNode == null) return;
+      const node = maybeNode;
+      const centerX = node.x() + node.width() / 2;
+      const centerY = node.y() + node.height() / 2;
+      const inside = centerX >= x && centerX <= x + width && centerY >= y && centerY <= y + height;
+      if (inside) newEnumNames.push(enumName);
+    });
+
+    // Diff and apply
+    const current = tableGroupsStore.getGroup(group.id);
+    const prevTables = current?.tableNames ?? [];
+    const prevEnums = current?.enumNames ?? [];
+
+    const toAddTables = newTableNames.filter((n) => !prevTables.includes(n));
+    const toRemoveTables = prevTables.filter((n) => !newTableNames.includes(n));
+  toAddTables.forEach((n) => { tableGroupsStore.addTableToGroup(group.id, n); });
+  toRemoveTables.forEach((n) => { tableGroupsStore.removeTableFromGroup(group.id, n); });
+
+  const toAddEnums = newEnumNames.filter((n) => !prevEnums.includes(n));
+  const toRemoveEnums = prevEnums.filter((n) => !newEnumNames.includes(n));
+  toAddEnums.forEach((n) => { tableGroupsStore.addEnumToGroup(group.id, n); });
+  toRemoveEnums.forEach((n) => { tableGroupsStore.removeEnumFromGroup(group.id, n); });
+
+    if (toAddTables.length > 0 || toRemoveTables.length > 0 || toAddEnums.length > 0 || toRemoveEnums.length > 0) {
+      tableGroupsStore.saveCurrentStore();
+    }
+  };
 
   return (
     <Group

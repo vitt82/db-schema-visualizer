@@ -6,9 +6,15 @@
     "lib": ["ES2022", "DOM"],
     "sourceMap": true,
     "rootDir": "./",
+    "baseUrl": "./",
     "strict": true,
     "jsx": "react-jsx",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "json-table-schema-visualizer/*": ["../json-table-schema-visualizer/*"],
+      "shared/*": ["../shared/*"],
+      "@/*": ["./*"]
+    }
   },
   "exclude": ["node_modules"],
   "include": ["**/*.ts", "**/*.tsx"]

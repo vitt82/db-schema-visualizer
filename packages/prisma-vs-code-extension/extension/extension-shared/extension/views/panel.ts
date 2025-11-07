@@ -31,6 +31,7 @@ export class MainPanel {
   private readonly _disposables: Disposable[] = [];
   // to add debouncing on diagram update after a file change
   private _lastTimeout: NodeJS.Timeout | null = null;
+  private readonly _readyPromise: Promise<void>;
   public static parseCode: (code: string) => JSONTableSchema;
   public static fileExt: string;
   public static lastDocument: TextDocument | undefined;
@@ -59,7 +60,7 @@ export class MainPanel {
     const disposables = this._disposables;
     const extConfig = extensionConfig;
 
-    void (async () => {
+    const setupWebviewWithPersistedData = async (): Promise<void> => {
       const persistedData: Record<string, unknown> = {};
       try {
         const wsFolder = workspace.workspaceFolders?.[0]?.uri;
@@ -67,26 +68,60 @@ export class MainPanel {
           const dbmlDir = Uri.joinPath(wsFolder, ".DBML");
           try {
             const entries = await workspace.fs.readDirectory(dbmlDir);
+            console.log("[MainPanel] Found .DBML directory with entries:", entries.length);
             for (const [name] of entries) {
               if (name.endsWith('.json')) {
                 try {
                   const fileUri = Uri.joinPath(dbmlDir, name);
                   const data = await workspace.fs.readFile(fileUri);
                   const text = new TextDecoder().decode(data);
-                  const key = name.replace(/\.json$/, '').replace(/__/g, ':');
-                  persistedData[key] = JSON.parse(text);
+                  // Unescape the key: __ becomes either : or /
+                  const keyUnescaped = name
+                    .replace(/\.json$/, '')
+                    .replace(/__\//g, '/') // Replace __/ with /
+                    .replace(/__/g, ':'); // Replace remaining __ with :
+                  persistedData[keyUnescaped] = JSON.parse(text);
+                  console.log("[MainPanel] Loaded persisted data - file:", name, "key:", keyUnescaped, "entries:", Array.isArray(persistedData[keyUnescaped]) ? (persistedData[keyUnescaped] as unknown[]).length : "not array");
                 } catch (e) {
                   // ignore file parse errors
-                  console.error('Failed to read persisted file', name, e);
+                  console.error('[MainPanel] Failed to read persisted file', name, e);
                 }
               }
             }
           } catch {
             // no .DBML folder yet
+            console.log("[MainPanel] No .DBML directory found");
           }
         }
       } catch (e) {
-        console.error('Failed to collect persisted data for webview', e);
+        console.error('[MainPanel] Failed to collect persisted data for webview', e);
+      }
+
+      console.log("[MainPanel] Total persisted keys to inject:", Object.keys(persistedData).length, "keys:", Object.keys(persistedData));
+
+      // Migrate legacy tableGroups:none into document-specific persisted key if needed
+      try {
+        const activeDoc = window.activeTextEditor?.document;
+        const wsFolderForMigration = workspace.workspaceFolders?.[0]?.uri;
+        if (activeDoc != null && Object.prototype.hasOwnProperty.call(persistedData, "tableGroups:none") && wsFolderForMigration != null) {
+          const docKey = `tableGroups:${activeDoc.uri.toString()}`;
+          if (!Object.prototype.hasOwnProperty.call(persistedData, docKey)) {
+            console.log("[MainPanel] Migrating legacy tableGroups:none to document key:", docKey);
+            const legacy = persistedData["tableGroups:none"];
+            const filename = docKey.replace(/:/g, "__").replace(/\//g, "__") + ".json";
+            const fileUri = Uri.joinPath(wsFolderForMigration, ".DBML", filename);
+            try {
+              const content = new TextEncoder().encode(JSON.stringify(legacy, null, 2));
+              await workspace.fs.writeFile(fileUri, content);
+              persistedData[docKey] = legacy;
+              console.log("[MainPanel] Migration successful, wrote file:", filename);
+            } catch (e) {
+              console.error('[MainPanel] Migration: failed to write migrated file', e);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[MainPanel] Migration check failed', e);
       }
 
       const html = WebviewHelper.setupHtml(
@@ -104,7 +139,15 @@ export class MainPanel {
         disposables,
         MainPanel.refreshCurrentSchema,
       );
-    })();
+    };
+
+    this._readyPromise = setupWebviewWithPersistedData().catch((error) => {
+      console.error("[MainPanel] Failed to setup webview with persisted data", error);
+    });
+  }
+
+  public get ready(): Promise<void> {
+    return this._readyPromise;
   }
 
   /**
@@ -198,15 +241,15 @@ export class MainPanel {
     console.log("[MainPanel.render] Registering diagram updater");
     MainPanel.registerDiagramUpdaterOnfFileChange();
 
-    console.log("[MainPanel.render] Publishing schema");
-    MainPanel.publishSchema(editor.document);
+  console.log("[MainPanel.render] Publishing schema");
+  void MainPanel.publishSchema(editor.document);
 
     console.log("[MainPanel.render] Render completed successfully");
   }
 
   static getCurrentEditor(): TextEditor | undefined {
     const editor = window.activeTextEditor;
-    if (editor === null) {
+    if (editor === undefined) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       window.showErrorMessage("No active text editor found.");
       return;
@@ -215,7 +258,7 @@ export class MainPanel {
     return editor;
   }
 
-  static publishSchema = (document: TextDocument): void => {
+  static publishSchema = async (document: TextDocument): Promise<void> => {
     const code = document.getText();
     try {
       const schema = MainPanel.parseCode(code);
@@ -226,17 +269,19 @@ export class MainPanel {
       // Debug log so extension host shows when we publish schema
       console.log("MainPanel.publishSchema: publishing schema for", document.uri.toString());
 
-      // Post the schema to the webview if present
-      // Use MainPanel.currentPanel explicitly to avoid issues with `this` binding
-      if (MainPanel.currentPanel?._panel) {
-        MainPanel.currentPanel._panel.webview.postMessage({
-          type: "setSchema",
-          payload: schema,
-          key: document.uri.toString(),
-        });
-      } else {
+      const panel = MainPanel.currentPanel;
+      if (panel === undefined) {
         console.warn("MainPanel.publishSchema: no currentPanel available to post schema");
+        return;
       }
+
+      await panel.ready;
+
+      await panel._panel.webview.postMessage({
+        type: "setSchema",
+        payload: schema,
+        key: document.uri.toString(),
+      });
 
       MainPanel.diagnosticCollection.clear();
     } catch (error) {
@@ -264,14 +309,14 @@ export class MainPanel {
 
   static refreshCurrentSchema = (): void => {
     const editor = MainPanel.getCurrentEditor();
-    if (editor !== null) {
-      MainPanel.publishSchema(editor.document);
+    if (editor !== undefined) {
+      void MainPanel.publishSchema(editor.document);
       return;
     }
 
     // fallback to last published document if any
     if (MainPanel.lastDocument !== undefined) {
-      MainPanel.publishSchema(MainPanel.lastDocument);
+      void MainPanel.publishSchema(MainPanel.lastDocument);
       return;
     }
 
@@ -286,7 +331,7 @@ export class MainPanel {
    * Reload persisted data from .DBML/ and send to webview
    */
   static async reloadPersistedData(): Promise<void> {
-    if (MainPanel.currentPanel?._panel === null) {
+    if (MainPanel.currentPanel?._panel === undefined) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       window.showErrorMessage("No diagram preview is open. Please open a Prisma diagram first.");
       return;

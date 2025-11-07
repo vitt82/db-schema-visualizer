@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { type JSONTableSchema } from "shared/types/tableSchema";
+import { type JSONTableGroup } from "shared/types/tableGroup";
 
 import { tableCoordsStore } from "json-table-schema-visualizer/src/stores/tableCoords";
 import { stageStateStore } from "json-table-schema-visualizer/src/stores/stagesState";
@@ -26,6 +27,12 @@ export const useSchema = (): {
     }
 
     if (message.key !== schemaKey) {
+      // Get persisted groups from EXTENSION_PERSISTED_DATA
+      const persistedData = (window as any).EXTENSION_PERSISTED_DATA ?? {};
+      const groupsKey = `tableGroups:${message.key}`;
+      const persistedGroups = persistedData[groupsKey] ?? [];
+      console.log("[useSchema] Loading groups for key:", message.key, "persisted groups found:", Array.isArray(persistedGroups) ? persistedGroups.length : 0);
+      
       // update stores
       tableCoordsStore.switchTo(
         message.key,
@@ -40,9 +47,30 @@ export const useSchema = (): {
         message.payload.enums ?? [],
       );
       // switch table groups store (keep groups per schema key)
+      // FIXED: Use persisted groups if available (they have priority over schema groups)
+      // because user may have created/modified groups in the UI
+      let persistedGroupsArray: JSONTableGroup[] = [];
+      if (Array.isArray(persistedGroups)) {
+        if (
+          persistedGroups.length > 0 &&
+          Array.isArray(persistedGroups[0]) &&
+          (persistedGroups[0] as unknown[]).length === 2
+        ) {
+          persistedGroupsArray = (persistedGroups as Array<[string, JSONTableGroup]>).map(([, group]) => group);
+        } else {
+          persistedGroupsArray = persistedGroups as JSONTableGroup[];
+        }
+      }
+
+      const groupsToUse: JSONTableGroup[] = persistedGroupsArray.length > 0
+        ? persistedGroupsArray
+        : (message.payload.groups ?? []);
+      
+      console.log("[useSchema] Using groups:", groupsToUse.length > 0 ? "persisted from storage" : "from schema payload");
+      
       tableGroupsStore.switchTo(
         message.key,
-        message.payload.groups ?? [],
+        groupsToUse,
       );
       stageStateStore.switchTo(message.key);
       detailLevelStore.switchTo(message.key);

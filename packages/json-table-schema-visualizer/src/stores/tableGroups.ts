@@ -13,12 +13,64 @@ interface GroupDimensions {
 
 class TableGroupsStore extends PersistableStore<Array<[string, JSONTableGroup & GroupDimensions]>> {
   private groups = new Map<string, JSONTableGroup & GroupDimensions>();
-  private currentStoreKey = "none";
+  private currentStoreKey: string | null = null;
 
   static GROUPS_CHANGED_EVENT = "tableGroups:changed";
 
   constructor() {
     super("tableGroups");
+  }
+
+  // Be tolerant with old persisted formats:
+  // - current format: Array<[id, group]>
+  // - possible legacy A: Array<group> (with group.id)
+  // - possible legacy B: Record<id, group>
+  private normalizeToEntries(
+    value: unknown,
+  ): Array<[string, JSONTableGroup & GroupDimensions]> {
+    if (Array.isArray(value)) {
+      if (value.length === 0) return [];
+      const first = value[0] as unknown;
+      // tuple-like [id, obj]
+      if (
+        Array.isArray(first) &&
+        first.length === 2 &&
+        typeof first[0] === "string" &&
+        typeof first[1] === "object" &&
+        first[1] !== null
+      ) {
+        return (value as Array<[string, JSONTableGroup & GroupDimensions]> )
+          .filter((t: [string, JSONTableGroup & GroupDimensions]) => Array.isArray(t) && t.length === 2 && typeof t[0] === "string");
+      }
+      // array of objects with .id
+      const asObjs = value.filter((v) => typeof v === "object" && v !== null) as Array<JSONTableGroup & Partial<GroupDimensions>>;
+      if (asObjs.length === value.length) {
+        return asObjs
+          .filter((g) => typeof (g as any).id === "string")
+          .map((g) => [ (g as any).id as string, {
+            ...(g as JSONTableGroup),
+            x: (g as any).x ?? 0,
+            y: (g as any).y ?? 0,
+            width: (g as any).width ?? 400,
+            height: (g as any).height ?? 300,
+          }]);
+      }
+      return [];
+    }
+
+    if (typeof value === "object" && value !== null) {
+      // record id -> group
+      const entries = Object.entries(value as Record<string, JSONTableGroup & Partial<GroupDimensions>>);
+      return entries.map(([id, g]) => [id, {
+        ...(g as JSONTableGroup),
+        x: (g as any).x ?? 0,
+        y: (g as any).y ?? 0,
+        width: (g as any).width ?? 400,
+        height: (g as any).height ?? 300,
+      }]);
+    }
+
+    return [];
   }
 
   protected getDefaultStoreValue(): Array<[string, JSONTableGroup & GroupDimensions]> {
@@ -61,31 +113,73 @@ class TableGroupsStore extends PersistableStore<Array<[string, JSONTableGroup & 
   }
 
   public saveCurrentStore(): void {
+    if (this.currentStoreKey == null) {
+      console.log("[TableGroupsStore] saveCurrentStore - skipped because currentStoreKey is null");
+      return;
+    }
+
     const storeValue = Array.from(this.groups);
     console.log("[TableGroupsStore] saveCurrentStore - key:", this.currentStoreKey, "groups count:", storeValue.length);
     this.persist(this.currentStoreKey, storeValue);
   }
 
   public switchTo(newStoreKey: string, initialGroups: JSONTableGroup[] = []): void {
-    this.saveCurrentStore();
+    console.log("[TableGroupsStore] switchTo START - newStoreKey:", newStoreKey, "initialGroups count:", initialGroups.length);
+
+    const previousKey = this.currentStoreKey;
+    if (previousKey !== null && previousKey !== newStoreKey) {
+      console.log("[TableGroupsStore] switchTo - persisting previous key:", previousKey);
+      this.saveCurrentStore();
+    }
 
     this.currentStoreKey = newStoreKey;
-    console.log("[TableGroupsStore] switchTo - newStoreKey:", newStoreKey);
-    
-    const recoveredStore = this.retrieve(this.currentStoreKey) as Array<
-      [string, JSONTableGroup & GroupDimensions]
-    >;
-    
-    console.log("[TableGroupsStore] switchTo - recoveredStore:", recoveredStore);
-    
-    if (recoveredStore === null || !Array.isArray(recoveredStore)) {
-      console.log("[TableGroupsStore] switchTo - No persisted data, initializing with:", initialGroups);
+    const persistenceKey = this.createPersistanceKey(this.currentStoreKey);
+    console.log("[TableGroupsStore] switchTo - persistence key:", persistenceKey);
+
+    const rawRecovered = this.retrieve(this.currentStoreKey);
+    const recoveredStore = this.normalizeToEntries(rawRecovered);
+    const hasRecovered = Array.isArray(recoveredStore) && recoveredStore.length > 0;
+    console.log(
+      "[TableGroupsStore] switchTo - recoveredStore entries:",
+      hasRecovered ? recoveredStore.length : 0,
+      "from type:", rawRecovered === null ? "null" : typeof rawRecovered,
+    );
+
+    if (!hasRecovered) {
+      console.log("[TableGroupsStore] switchTo - No persisted data for key, checking legacy 'none'");
+      const rawLegacy = this.retrieve("none");
+      const legacyStore = this.normalizeToEntries(rawLegacy);
+
+      if (Array.isArray(legacyStore) && legacyStore.length > 0) {
+        console.log(
+          "[TableGroupsStore] switchTo - Migrating",
+          legacyStore.length,
+          "groups from legacy 'none' key to",
+          this.currentStoreKey,
+        );
+        this.groups = new Map<string, JSONTableGroup & GroupDimensions>(legacyStore);
+        this.saveCurrentStore();
+        this.clear("none");
+        console.log("[TableGroupsStore] switchTo - Legacy 'none' key cleared after migration");
+        eventEmitter.emit(TableGroupsStore.GROUPS_CHANGED_EVENT);
+        return;
+      }
+
+      console.log(
+        "[TableGroupsStore] switchTo - Initializing store with schema groups count:",
+        initialGroups.length,
+      );
       this.initGroups(initialGroups);
+      eventEmitter.emit(TableGroupsStore.GROUPS_CHANGED_EVENT);
       return;
     }
 
     this.groups = new Map<string, JSONTableGroup & GroupDimensions>(recoveredStore);
-    console.log("[TableGroupsStore] switchTo - Loaded groups from storage:", Array.from(this.groups.keys()));
+    console.log(
+      "[TableGroupsStore] switchTo COMPLETE - Loaded groups from storage:",
+      Array.from(this.groups.keys()),
+    );
+    eventEmitter.emit(TableGroupsStore.GROUPS_CHANGED_EVENT);
   }
 
   public setGroupDimensions(id: string, dimensions: Partial<GroupDimensions>): void {
@@ -174,7 +268,7 @@ class TableGroupsStore extends PersistableStore<Array<[string, JSONTableGroup & 
 
   public removeEnumFromGroup(groupId: string, enumName: string): void {
     const group = this.groups.get(groupId);
-    if (group != null && group.enumNames != null) {
+    if (group?.enumNames != null) {
       group.enumNames = group.enumNames.filter((name) => name !== enumName);
       this.saveCurrentStore();
     }

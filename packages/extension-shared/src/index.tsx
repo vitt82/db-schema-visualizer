@@ -2,6 +2,10 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 import "@tomjs/vscode-extension-webview/client";
 import { tableCoordsStore } from "json-table-schema-visualizer/src/stores/tableCoords";
+import { tableGroupsStore } from "json-table-schema-visualizer/src/stores/tableGroups";
+import { enumCoordsStore } from "json-table-schema-visualizer/src/stores/enumCoords";
+import { stageStateStore } from "json-table-schema-visualizer/src/stores/stagesState";
+import { detailLevelStore } from "json-table-schema-visualizer/src/stores/detailLevelStore";
 
 import App from "./App";
 
@@ -40,11 +44,36 @@ export const createExtensionApp = () => {
         window.location.reload();
       }
     }
+    // Handle SAVE_AND_CLOSE command from host (when webview is hidden)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
+    if (message != null && typeof message === "object" && (message as any).command === "SAVE_AND_CLOSE") {
+      console.log("[Webview] Received SAVE_AND_CLOSE command, saving all stores");
+      tableCoordsStore.saveCurrentStore();
+      tableGroupsStore.saveCurrentStore();
+      enumCoordsStore.saveCurrentStore();
+      stageStateStore.saveCurrentState();
+      detailLevelStore.saveCurrentState();
+    }
   });
 
   // save current table position when exiting the page
   window.addEventListener("unload", () => {
+    console.log("[Webview] unload event triggered, saving all stores");
     tableCoordsStore.saveCurrentStore();
+    tableGroupsStore.saveCurrentStore();
+    enumCoordsStore.saveCurrentStore();
+    stageStateStore.saveCurrentState();
+    detailLevelStore.saveCurrentState();
+  });
+
+  // Also save on beforeunload (more reliable than unload)
+  window.addEventListener("beforeunload", () => {
+    console.log("[Webview] beforeunload event triggered, saving all stores");
+    tableCoordsStore.saveCurrentStore();
+    tableGroupsStore.saveCurrentStore();
+    enumCoordsStore.saveCurrentStore();
+    stageStateStore.saveCurrentState();
+    detailLevelStore.saveCurrentState();
   });
 
   const View = () => {

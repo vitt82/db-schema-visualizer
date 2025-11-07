@@ -32,5 +32,8 @@ export const prismaASTToJSONTableSchema = (
     );
   });
 
-  return { tables, enums, refs };
+  // TODO: Parse table groups from Prisma comments (e.g., /// @group GroupName)
+  const groups: JSONTableSchema["groups"] = [];
+
+  return { tables, enums, refs, groups };
 };

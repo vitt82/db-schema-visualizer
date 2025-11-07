@@ -2,6 +2,8 @@ import DiagramViewer from "json-table-schema-visualizer/src/components/DiagramVi
 import { useCreateTheme } from "json-table-schema-visualizer/src/hooks/theme";
 import ThemeProvider from "json-table-schema-visualizer/src/providers/ThemeProvider";
 import NoSchemaMessage from "json-table-schema-visualizer/src/components/Messages/NoSchemaMessage";
+import ToastContainer from "json-table-schema-visualizer/src/components/Toast/ToastContainer";
+import { ToastProvider } from "json-table-schema-visualizer/src/contexts/ToastContext";
 import { type Theme } from "json-table-schema-visualizer/src/types/theme";
 import ScrollDirectionProvider from "json-table-schema-visualizer/src/providers/ScrollDirectionProvider";
 
@@ -40,17 +42,20 @@ const App = () => {
   };
 
   return (
-    <ThemeProvider
-      theme={theme}
-      setTheme={saveThemePreference}
-      themeColors={themeColors}
-    >
-      <ScrollDirectionProvider
-        scrollDirection={window.EXTENSION_DEFAULT_CONFIG?.scrollDirection}
+    <ToastProvider>
+      <ThemeProvider
+        theme={theme}
+        setTheme={saveThemePreference}
+        themeColors={themeColors}
       >
-  <DiagramViewer key={key ?? undefined} schemaKey={key ?? undefined} {...schema} />
-      </ScrollDirectionProvider>
-    </ThemeProvider>
+        <ScrollDirectionProvider
+          scrollDirection={window.EXTENSION_DEFAULT_CONFIG?.scrollDirection}
+        >
+          <DiagramViewer key={key ?? undefined} schemaKey={key ?? undefined} {...schema} />
+        </ScrollDirectionProvider>
+      </ThemeProvider>
+      <ToastContainer />
+    </ToastProvider>
   );
 };
 

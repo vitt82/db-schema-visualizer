@@ -23,11 +23,35 @@ export class AppLocalStorage<T> extends Storage<T> {
         return injected[key] as object;
       }
 
+      // Compatibility fallback: if we are looking for a document-specific
+      // tableGroups key (e.g. "tableGroups:file://...") but only a legacy
+      // "tableGroups:none" entry exists, use that as a fallback so the UI
+      // can restore existing groups until a proper migration runs.
+      try {
+        if (typeof key === "string" && key.startsWith("tableGroups:") && injected != null && Object.prototype.hasOwnProperty.call(injected, "tableGroups:none")) {
+          console.log("[AppLocalStorage.getItem] Falling back to legacy tableGroups:none for key:", key);
+          const legacy = injected["tableGroups:none"] as object;
+          // populate the cache under the new key so subsequent reads hit the fast path
+          injected[key] = legacy;
+          return legacy;
+        }
+      } catch (e) {
+        // ignore fallback errors and continue to localStorage fallback
+        console.error("[AppLocalStorage.getItem] Legacy fallback failed", e);
+      }
+
       const value = localStorage.getItem(key);
       console.log("[AppLocalStorage.getItem] Fallback to localStorage, got:", value !== null ? "data" : "null");
       if (value === null) return null;
 
-      return JSON.parse(value);
+      const parsed = JSON.parse(value);
+
+      if (injected != null) {
+        // keep injected cache in sync so future getItem hits the fast path
+        injected[key] = parsed;
+      }
+
+      return parsed;
     } catch (err) {
       // If anything goes wrong, fall back to null
       // eslint-disable-next-line no-console
@@ -38,16 +62,23 @@ export class AppLocalStorage<T> extends Storage<T> {
 
   setItem(key: string, value: T): void {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      const serialized = JSON.stringify(value);
+      localStorage.setItem(key, serialized);
 
       // If running inside a VS Code webview, ask the extension host to persist the file
       // We post a message with shape { command, message }
       // Use the same command strings the extension expects: FILE_WRITE
       
       // DEBUG: Log what we're trying to save
-      console.log("[AppLocalStorage.setItem] Saving key:", key, "value length:", JSON.stringify(value).length);
+      console.log("[AppLocalStorage.setItem] Saving key:", key, "value length:", serialized.length);
       console.log("[AppLocalStorage.setItem] window.vsCodeWebviewAPI:", (window as any).vsCodeWebviewAPI);
       
+      // update injected cache immediately so subsequent getItem reads the fresh value
+      const injected = (window as any).EXTENSION_PERSISTED_DATA as Record<string, unknown> | undefined;
+      if (injected != null) {
+        injected[key] = value as unknown;
+      }
+
       const api = (window as any).vsCodeWebviewAPI;
       
       if (api !== undefined && api !== null && typeof api.postMessage === "function") {
@@ -76,6 +107,11 @@ export class AppLocalStorage<T> extends Storage<T> {
   removeItem(key: string): void {
     try {
       localStorage.removeItem(key);
+
+      const injected = (window as any).EXTENSION_PERSISTED_DATA as Record<string, unknown> | undefined;
+      if (injected != null) {
+        Reflect.deleteProperty(injected, key);
+      }
 
       // request deletion from extension host if inside a webview
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

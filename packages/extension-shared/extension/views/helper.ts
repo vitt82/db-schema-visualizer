@@ -36,6 +36,8 @@ export class WebviewHelper {
     persistedData?: Record<string, unknown>,
   ): string {
     const persisted = persistedData ?? {};
+    console.log("[WebviewHelper.injectDefaultConfig] Injecting persisted data keys:", Object.keys(persisted));
+    console.log("[WebviewHelper.injectDefaultConfig] Persisted data content:", JSON.stringify(persisted).substring(0, 500));
     return html.replace(
       WEBVIEW_HTML_MARKER_FOR_DEFAULT_CONFIG,
       `
@@ -97,24 +99,29 @@ export class WebviewHelper {
 
   public static setupWebviewHooks(
     webview: Webview,
-    extensionConfig: ExtensionConfig,
+    extConfig: ExtensionConfig,
     disposables: Disposable[],
-    onRefreshSchema?: () => void,
+    refreshCurrentSchema: () => void,
   ): void {
+    console.log("[WebviewHelper] Setting up webview hooks - registering onDidReceiveMessage");
     webview.onDidReceiveMessage(
       async (message: WebviewPostMessage) => {
         const command = message.command;
         const textMessage = message.message;
-        console.log("[WebviewHelper] Received message:", command, "payload length:", textMessage?.length ?? 0);
+        console.log("[WebviewHelper] onDidReceiveMessage triggered - command:", command, "payload length:", textMessage?.length ?? 0);
 
         // Handle file persistence commands directly here so we can use workspace.fs
         if (command === WebviewCommand.FILE_WRITE) {
           try {
+            console.log("[WebviewHelper] FILE_WRITE handler - raw message:", textMessage);
             const payload = JSON.parse(textMessage);
             const key: string = payload.key;
             const value = payload.value;
 
-            console.log("[WebviewHelper] FILE_WRITE - key:", key, "value length:", JSON.stringify(value).length);
+            console.log("[WebviewHelper] FILE_WRITE - key:", key);
+            console.log("[WebviewHelper] FILE_WRITE - value type:", typeof value, "is array:", Array.isArray(value));
+            console.log("[WebviewHelper] FILE_WRITE - value length:", JSON.stringify(value).length);
+            console.log("[WebviewHelper] FILE_WRITE - first 500 chars of value:", JSON.stringify(value).substring(0, 500));
 
             const wsFolder = workspace.workspaceFolders?.[0]?.uri;
             if (!wsFolder) throw new Error("No workspace folder available");
@@ -129,9 +136,13 @@ export class WebviewHelper {
               await workspace.fs.createDirectory(dbmlDir);
             }
 
-            const filename = key.replace(/:/g, "__") + ".json";
+            // Use encodeURIComponent to produce a reversible, safe filename
+            const filename = encodeURIComponent(key) + ".json";
+            console.log("[WebviewHelper] Creating file with name:", filename);
             const fileUri = Uri.joinPath(dbmlDir, filename);
+            console.log("[WebviewHelper] File URI:", fileUri.toString());
             const content = new TextEncoder().encode(JSON.stringify(value, null, 2));
+            console.log("[WebviewHelper] Content size:", content.length, "bytes");
             await workspace.fs.writeFile(fileUri, content);
 
             console.log("[WebviewHelper] Successfully wrote file:", filename);
@@ -160,7 +171,7 @@ export class WebviewHelper {
             if (!wsFolder) throw new Error("No workspace folder available");
 
             const dbmlDir = Uri.joinPath(wsFolder, ".DBML");
-            const filename = key.replace(/:/g, "__") + ".json";
+            const filename = encodeURIComponent(key) + ".json";
             const fileUri = Uri.joinPath(dbmlDir, filename);
             await workspace.fs.delete(fileUri);
 
@@ -194,7 +205,8 @@ export class WebviewHelper {
                     const fileUri = Uri.joinPath(dbmlDir, name);
                     const data = await workspace.fs.readFile(fileUri);
                     const text = new TextDecoder().decode(data);
-                    const key = name.replace(/\.json$/, '').replace(/__/g, ':');
+                    // decode filename back to original key
+                    const key = decodeURIComponent(name.replace(/\.json$/, ''));
                     persistedData[key] = JSON.parse(text);
                   } catch (e) {
                     console.error('[WebviewHelper] Failed to read persisted file', name, e);
@@ -221,8 +233,8 @@ export class WebviewHelper {
         WebviewHelper.handleWebviewMessage(
           command,
           textMessage,
-          extensionConfig,
-          onRefreshSchema,
+          extConfig,
+          refreshCurrentSchema,
         );
       },
       undefined,
