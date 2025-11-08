@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Group, Rect, Text as KonvaText, Circle } from "react-konva";
-import type Konva from "konva";
 
+import type Konva from "konva";
 import type { JSONTableGroup } from "shared/types/tableGroup";
 
 import { useThemeColors } from "@/hooks/theme";
@@ -343,7 +343,7 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
         x={PADDINGS.md}
         y={12}
         text={`${group.name} (${group.tableNames.length} tabla${group.tableNames.length !== 1 ? "s" : ""}${(group.enumNames?.length ?? 0) > 0 ? `, ${group.enumNames?.length ?? 0} enum${(group.enumNames?.length ?? 0) !== 1 ? "s" : ""}` : ""})`}
-        fontSize={16}
+        fontSize={30}
         fontStyle="bold"
         fill={textColor}
         onDblClick={handleTitleDblClick}
