@@ -332,7 +332,7 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
         x={0}
         y={0}
         width={dimensions.width}
-        height={40}
+        height={60}
         fill={borderColor}
         cornerRadius={[PADDINGS.sm, PADDINGS.sm, 0, 0]}
         opacity={0.8}
@@ -351,7 +351,7 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
 
       <Group
         x={dimensions.width - 30}
-        y={8}
+        y={18}
         onClick={handleDelete}
         onMouseEnter={(e) => {
           const container = e.target.getStage()?.container();
