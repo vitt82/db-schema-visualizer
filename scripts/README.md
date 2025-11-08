@@ -2,9 +2,24 @@
 
 Este directorio contiene utilidades para empaquetar e instalar localmente las extensiones VS Code incluidas en este repositorio.
 
-Archivo principal
+Archivos principales
 
 - `package-and-install.sh` — Script que construye y empaqueta los paquetes de extensión (`packages/prisma-vs-code-extension` y `packages/dbml-vs-code-extension`) y, si la CLI `code` está disponible, instala los `.vsix` resultantes en la instancia local de VS Code.
+
+- `rebuild-and-install.sh` — **Script completo de desarrollo** que:
+  1. Cierra todas las instancias de VS Code
+  2. Limpia cache y builds anteriores
+  3. Compila la extensión Prisma
+  4. Empaqueta el `.vsix`
+  5. Desinstala la versión anterior
+  6. Instala la nueva versión
+  7. Opcionalmente limpia datos persistentes (`.DBML`)
+  8. Reabre VS Code
+  
+  **Uso recomendado durante desarrollo activo:**
+  ```bash
+  ./scripts/rebuild-and-install.sh
+  ```
 
 Requisitos
 

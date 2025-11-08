@@ -6,7 +6,7 @@ export interface ControlPoint extends XYPosition {
   id: string;
 }
 
-// Key: "sourceTable-targetTable-relationOwner"
+// Key: "sourceTable-sourceField-targetTable-targetField-relationOwner"
 class ConnectionControlPointsStore extends PersistableStore<Array<[string, ControlPoint[]]>> {
   private controlPoints = new Map<string, ControlPoint[]>();
   private readonly currentStoreKey = "connectionControlPoints";
@@ -15,17 +15,25 @@ class ConnectionControlPointsStore extends PersistableStore<Array<[string, Contr
     super("connectionControlPoints");
   }
 
-  private getKey(sourceTableName: string, targetTableName: string, relationOwner: string): string {
-    return `${sourceTableName}-${targetTableName}-${relationOwner}`;
+  private getKey(
+    sourceTableName: string,
+    sourceFieldName: string,
+    targetTableName: string,
+    targetFieldName: string,
+    relationOwner: string
+  ): string {
+    return `${sourceTableName}-${sourceFieldName}-${targetTableName}-${targetFieldName}-${relationOwner}`;
   }
 
   addControlPoint(
     sourceTableName: string,
+    sourceFieldName: string,
     targetTableName: string,
+    targetFieldName: string,
     relationOwner: string,
     point: XYPosition
   ): void {
-    const key = this.getKey(sourceTableName, targetTableName, relationOwner);
+    const key = this.getKey(sourceTableName, sourceFieldName, targetTableName, targetFieldName, relationOwner);
     const current = this.controlPoints.get(key) ?? [];
     
     const id = `cp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -37,12 +45,14 @@ class ConnectionControlPointsStore extends PersistableStore<Array<[string, Contr
 
   moveControlPoint(
     sourceTableName: string,
+    sourceFieldName: string,
     targetTableName: string,
+    targetFieldName: string,
     relationOwner: string,
     controlPointId: string,
     newPosition: XYPosition
   ): void {
-    const key = this.getKey(sourceTableName, targetTableName, relationOwner);
+    const key = this.getKey(sourceTableName, sourceFieldName, targetTableName, targetFieldName, relationOwner);
     const points = this.controlPoints.get(key) ?? [];
     
     const index = points.findIndex((p) => p.id === controlPointId);
@@ -55,11 +65,13 @@ class ConnectionControlPointsStore extends PersistableStore<Array<[string, Contr
 
   removeControlPoint(
     sourceTableName: string,
+    sourceFieldName: string,
     targetTableName: string,
+    targetFieldName: string,
     relationOwner: string,
     controlPointId: string
   ): void {
-    const key = this.getKey(sourceTableName, targetTableName, relationOwner);
+    const key = this.getKey(sourceTableName, sourceFieldName, targetTableName, targetFieldName, relationOwner);
     const points = this.controlPoints.get(key) ?? [];
     
     const filtered = points.filter((p) => p.id !== controlPointId);
@@ -73,19 +85,23 @@ class ConnectionControlPointsStore extends PersistableStore<Array<[string, Contr
 
   getControlPoints(
     sourceTableName: string,
+    sourceFieldName: string,
     targetTableName: string,
+    targetFieldName: string,
     relationOwner: string
   ): ControlPoint[] {
-    const key = this.getKey(sourceTableName, targetTableName, relationOwner);
+    const key = this.getKey(sourceTableName, sourceFieldName, targetTableName, targetFieldName, relationOwner);
     return this.controlPoints.get(key) ?? [];
   }
 
   clearControlPoints(
     sourceTableName: string,
+    sourceFieldName: string,
     targetTableName: string,
+    targetFieldName: string,
     relationOwner: string
   ): void {
-    const key = this.getKey(sourceTableName, targetTableName, relationOwner);
+    const key = this.getKey(sourceTableName, sourceFieldName, targetTableName, targetFieldName, relationOwner);
     this.controlPoints.delete(key);
     this.saveCurrentStore();
   }

@@ -181,3 +181,94 @@ export function getStepPathWithRoundedCorners({
 
   return pathData;
 }
+
+/**
+ * Create a step path with rounded corners that passes through a midpoint
+ * This allows interactive editing of edges while maintaining smoothstep style
+ */
+export function getStepPathWithRoundedCornersAndMidpoint({
+  source,
+  sourcePosition = Position.Bottom,
+  target,
+  targetPosition = Position.Top,
+  midpoint,
+}: GetBezierPathParams & { midpoint: XYPosition }): string {
+  const sourceOffset = compteSymbolOffset(sourcePosition, source);
+  const targetOffset = compteSymbolOffset(targetPosition, target);
+
+  const cornerRadius = 35;
+  let pathData = `M${source.x},${source.y} L${sourceOffset.x},${sourceOffset.y}`;
+
+  const startX = sourceOffset.x;
+  const startY = sourceOffset.y;
+  const midX = midpoint.x;
+  const midY = midpoint.y;
+  const endX = targetOffset.x;
+  const endY = targetOffset.y;
+
+  // Source to midpoint segment
+  if (startX !== midX && startY !== midY) {
+    // Diagonal: need corner
+    const distX1 = Math.abs(midX - startX);
+    const distY1 = Math.abs(midY - startY);
+    const radius1 = Math.min(cornerRadius, distX1 / 2, distY1 / 2);
+
+    // Determine which direction to go first (prefer maintaining source direction)
+    const goHorizontalFirst = Math.abs(startX - midX) >= Math.abs(startY - midY);
+
+    if (goHorizontalFirst) {
+      // Horizontal then vertical
+      const beforeCornerX = midX > startX ? midX - radius1 : midX + radius1;
+      pathData += ` L${beforeCornerX},${startY}`;
+      const afterCornerY = midY > startY ? startY + radius1 : startY - radius1;
+      pathData += ` Q${midX},${startY} ${midX},${afterCornerY}`;
+      pathData += ` L${midX},${midY}`;
+    } else {
+      // Vertical then horizontal
+      const beforeCornerY = midY > startY ? midY - radius1 : midY + radius1;
+      pathData += ` L${startX},${beforeCornerY}`;
+      const afterCornerX = midX > startX ? startX + radius1 : startX - radius1;
+      pathData += ` Q${startX},${midY} ${afterCornerX},${midY}`;
+      pathData += ` L${midX},${midY}`;
+    }
+  } else if (startX !== midX || startY !== midY) {
+    // Straight line
+    pathData += ` L${midX},${midY}`;
+  }
+
+  // Midpoint to target segment
+  if (midX !== endX && midY !== endY) {
+    // Diagonal: need corner
+    const distX2 = Math.abs(endX - midX);
+    const distY2 = Math.abs(endY - midY);
+    const radius2 = Math.min(cornerRadius, distX2 / 2, distY2 / 2);
+
+    // Determine which direction to go first (prefer target direction)
+    const goHorizontalFirst2 = Math.abs(endX - midX) >= Math.abs(endY - midY);
+
+    if (goHorizontalFirst2) {
+      // Horizontal then vertical
+      const beforeCornerX = endX > midX ? endX - radius2 : endX + radius2;
+      pathData += ` L${beforeCornerX},${midY}`;
+      const afterCornerY = endY > midY ? midY + radius2 : midY - radius2;
+      pathData += ` Q${endX},${midY} ${endX},${afterCornerY}`;
+      pathData += ` L${endX},${endY}`;
+    } else {
+      // Vertical then horizontal
+      const beforeCornerY = endY > midY ? endY - radius2 : endY + radius2;
+      pathData += ` L${midX},${beforeCornerY}`;
+      const afterCornerX = endX > midX ? midX + radius2 : midX - radius2;
+      pathData += ` Q${midX},${endY} ${afterCornerX},${endY}`;
+      pathData += ` L${endX},${endY}`;
+    }
+  } else if (midX !== endX || midY !== endY) {
+    // Straight line
+    pathData += ` L${endX},${endY}`;
+  }
+
+  pathData += ` L${target.x},${target.y}`;
+
+  return pathData;
+}
+
+

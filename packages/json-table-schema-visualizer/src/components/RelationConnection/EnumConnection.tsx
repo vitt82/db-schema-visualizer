@@ -185,7 +185,9 @@ const EnumConnection = ({
     <ConnectionPath
       path={linePath}
       sourceTableName={sourceTableName}
+      sourceFieldName={sourceFieldName}
       targetTableName={enumName}
+      targetFieldName=""
       relationOwner={sourceTableName}
     />
   );

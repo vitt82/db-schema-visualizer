@@ -1,0 +1,406 @@
+import { useState, useRef, useEffect } from "react";
+import { Path, Group, Circle } from "react-konva";
+
+import type Konva from "konva";
+
+import { useThemeColors } from "@/hooks/theme";
+import { useTablesInfo } from "@/hooks/table";
+import { useTableColor } from "@/hooks/tableColor";
+import {
+  connectionControlPointsStore,
+} from "@/stores/connectionControlPoints";
+
+interface ConnectionPathProps {
+  path: string;
+  sourceTableName: string;
+  sourceFieldName: string;
+  targetTableName: string;
+  targetFieldName: string;
+  relationOwner: string;
+}
+
+const CONTROL_POINT_RADIUS = 10;
+const CONTROL_POINT_HOVER_RADIUS = 12;
+
+// Helper function to calculate the visual center of a path
+function getPathCenter(pathData: string): { x: number; y: number } | null {
+  const points: Array<{ x: number; y: number }> = [];
+  const commands = pathData.match(/[MLQC][^MLQC]*/g);
+  
+  if (commands == null) return null;
+
+  for (const cmd of commands) {
+    const type = cmd[0];
+    const coords = cmd.slice(1).trim().split(/[\s,]+/).map(Number);
+    
+    if (type === 'M' || type === 'L') {
+      if (coords.length >= 2) {
+        points.push({ x: coords[0], y: coords[1] });
+      }
+    } else if (type === 'Q') {
+      if (coords.length >= 4) {
+        points.push({ x: coords[2], y: coords[3] });
+      }
+    } else if (type === 'C') {
+      if (coords.length >= 6) {
+        points.push({ x: coords[4], y: coords[5] });
+      }
+    }
+  }
+  
+  if (points.length < 3) return null;
+  
+  // Return the middle point (skip first and last which are anchors)
+  const mainPoints = points.slice(1, -1);
+  if (mainPoints.length === 0) return null;
+  
+  const midIndex = Math.floor(mainPoints.length / 2);
+  return mainPoints[midIndex] ?? null;
+}
+
+const ConnectionPath = ({
+  path,
+  sourceTableName,
+  sourceFieldName,
+  targetTableName,
+  targetFieldName,
+  relationOwner,
+}: ConnectionPathProps) => {
+  const themeColors = useThemeColors();
+  const { hoveredTableName } = useTablesInfo();
+  const sourceTableColors = useTableColor(relationOwner);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [controlPoints, setControlPoints] = useState<ControlPoint[]>([]);
+  const pathRef = useRef<Konva.Path>(null);
+  const groupRef = useRef<Konva.Group>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
+
+  // Cargar control points al montar o generar automáticamente si no existen
+  useEffect(() => {
+    let points = connectionControlPointsStore.getControlPoints(
+      sourceTableName,
+      sourceFieldName,
+      targetTableName,
+      targetFieldName,
+      relationOwner
+    );
+    
+    // Si no hay puntos guardados, generar puntos automáticos del path
+    if (points.length === 0 && path.length > 0) {
+      const autoPoints = findMidPoints(path);
+      // No los guardamos automáticamente, solo los mostramos cuando se activa edición
+      points = autoPoints.map((p, i) => ({
+        id: `auto-${i}`,
+        x: p.x,
+        y: p.y,
+      }));
+    }
+    
+    setControlPoints(points);
+  }, [sourceTableName, sourceFieldName, targetTableName, targetFieldName, relationOwner, path]);
+
+  const highlight =
+    hoveredTableName === sourceTableName ||
+    hoveredTableName === targetTableName ||
+    isHovered;
+
+  const strokeColor = highlight
+    ? sourceTableColors?.regular ?? themeColors.connection.active
+    : themeColors.connection.default;
+
+  // Generar path dashed con control points
+  const dashedPath = isEditing && controlPoints.length > 0 ? generateDashedPath(path, controlPoints) : null;
+
+  const handlePathClick = (e: Konva.KonvaEventObject<MouseEvent>): void => {
+    e.cancelBubble = true;
+    const stage = e.currentTarget.getStage();
+    if (stage == null) return;
+
+    if (!isEditing) {
+      // Entrar en modo edición y generar puntos automáticos si no existen
+      setIsEditing(true);
+      stageRef.current = stage;
+      
+      // Si no hay puntos guardados, generar puntos automáticos del path
+      const savedPoints = connectionControlPointsStore.getControlPoints(
+        sourceTableName,
+        sourceFieldName,
+        targetTableName,
+        targetFieldName,
+        relationOwner
+      );
+      
+      if (savedPoints.length === 0 && path.length > 0) {
+        const autoPoints = findMidPoints(path);
+        const newPoints = autoPoints.map((p, i) => ({
+          id: `point-${Date.now()}-${i}`,
+          x: p.x,
+          y: p.y,
+        }));
+        
+        // Guardar los puntos automáticos
+        newPoints.forEach(point => {
+          connectionControlPointsStore.addControlPoint(
+            sourceTableName,
+            sourceFieldName,
+            targetTableName,
+            targetFieldName,
+            relationOwner,
+            { x: point.x, y: point.y }
+          );
+        });
+        
+        setControlPoints(newPoints);
+      }
+    }
+  };
+
+  const handleControlPointDragStart = (): void => {
+    const stage = pathRef.current?.getStage();
+    if (stage != null) {
+      stageRef.current = stage;
+    }
+  };
+
+  const handleControlPointDragMove = (pointId: string, x: number, y: number): void => {
+    connectionControlPointsStore.moveControlPoint(
+      sourceTableName,
+      sourceFieldName,
+      targetTableName,
+      targetFieldName,
+      relationOwner,
+      pointId,
+      { x, y }
+    );
+
+    setControlPoints((prev) =>
+      prev.map((p) => (p.id === pointId ? { ...p, x, y } : p))
+    );
+  };
+
+  const handleControlPointDragEnd = (): void => {
+    // Los puntos ya se guardaron en handleControlPointDragMove
+  };
+
+  // Escuchar clicks fuera para salir del modo edición
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleDocClick = (e: MouseEvent): void => {
+      // Si clickeó fuera del canvas, salir del modo edición
+      const stage = stageRef.current;
+      if (stage == null) return;
+
+      const container = stage.container();
+      if (container == null || !container.contains(e.target as Node)) {
+        setIsEditing(false);
+      }
+    };
+
+    document.addEventListener("click", handleDocClick);
+    return (): void => {
+      document.removeEventListener("click", handleDocClick);
+    };
+  }, [isEditing]);
+
+  return (
+    <Group ref={groupRef}>
+      {/* Línea principal */}
+      <Path
+        ref={pathRef}
+        data={path}
+        onMouseEnter={(): void => {
+          setIsHovered(true);
+        }}
+        onMouseLeave={(): void => {
+          setIsHovered(false);
+        }}
+        onClick={handlePathClick}
+        strokeWidth={isHovered ? 3 : 2}
+        stroke={strokeColor}
+        cursor={isEditing ? "crosshair" : "pointer"}
+      />
+
+      {/* Línea punteada con control points (solo cuando estamos editando) */}
+      {isEditing && controlPoints.length > 0 && (
+        <>
+          {/* Renderizar línea punteada */}
+          <Path
+            data={dashedPath ?? path}
+            strokeWidth={2}
+            stroke={strokeColor}
+            dash={[5, 5]}
+            opacity={0.6}
+            listening={false}
+          />
+
+          {/* Renderizar círculos de control */}
+          {controlPoints.map((point) => (
+            <DraggableControlPoint
+              key={point.id}
+              point={point}
+              pointRadius={CONTROL_POINT_RADIUS}
+              strokeColor={strokeColor}
+              backgroundColor={themeColors.bg}
+              onDragStart={handleControlPointDragStart}
+              onDragMove={(x, y) => {
+                handleControlPointDragMove(point.id, x, y);
+              }}
+              onDragEnd={handleControlPointDragEnd}
+            />
+          ))}
+        </>
+      )}
+    </Group>
+  );
+};
+
+interface DraggableControlPointProps {
+  point: ControlPoint;
+  pointRadius: number;
+  strokeColor: string;
+  backgroundColor: string;
+  onDragStart: () => void;
+  onDragMove: (x: number, y: number) => void;
+  onDragEnd: () => void;
+}
+
+const DraggableControlPoint = ({
+  point,
+  pointRadius,
+  strokeColor,
+  backgroundColor,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: DraggableControlPointProps) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const stageRef = useRef<Konva.Stage | null>(null);
+
+  const handleMouseDown = (): void => {
+    setIsDragging(true);
+    onDragStart();
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const stage = stageRef.current;
+    if (stage == null) return;
+
+    const handleMouseMove = (): void => {
+      const pointerPos = stage.getPointerPosition();
+      if (pointerPos == null) return;
+      onDragMove(pointerPos.x, pointerPos.y);
+    };
+
+    const handleMouseUp = (): void => {
+      setIsDragging(false);
+      onDragEnd();
+      document.removeEventListener("pointermove", handleMouseMove);
+      document.removeEventListener("pointerup", handleMouseUp);
+    };
+
+    document.addEventListener("pointermove", handleMouseMove);
+    document.addEventListener("pointerup", handleMouseUp);
+
+    return (): void => {
+      document.removeEventListener("pointermove", handleMouseMove);
+      document.removeEventListener("pointerup", handleMouseUp);
+    };
+  }, [isDragging, onDragMove, onDragEnd]);
+
+  return (
+    <Circle
+      ref={(node) => {
+        if (node != null) {
+          stageRef.current = node.getStage();
+        }
+      }}
+      x={point.x}
+      y={point.y}
+      radius={pointRadius}
+      fill={backgroundColor}
+      stroke={strokeColor}
+      strokeWidth={2}
+      onMouseDown={handleMouseDown}
+      onMouseEnter={(e): void => {
+        const stage = e.currentTarget.getStage();
+        const container = stage?.container();
+        if (container != null) {
+          // eslint-disable-next-line no-param-reassign
+          container.style.cursor = isDragging ? "grabbing" : "grab";
+        }
+      }}
+      onMouseLeave={(e): void => {
+        const stage = e.currentTarget.getStage();
+        const container = stage?.container();
+        if (container != null) {
+          // eslint-disable-next-line no-param-reassign
+          container.style.cursor = "default";
+        }
+      }}
+    />
+  );
+};
+
+// Helper: generar path modificado que pase por los control points
+function generateDashedPath(originalPath: string, controlPoints: ControlPoint[]): string {
+  if (controlPoints.length === 0) return originalPath;
+
+  // Extraer puntos del path original
+  const pathPoints = extractPathPoints(originalPath);
+  
+  if (pathPoints.length < 2) return originalPath;
+
+  // Separar el path en: inicio (source) + segmento principal + fin (target + arrow)
+  // Asumiendo que los primeros 2 puntos son el source y los últimos 2 son target+arrow
+  const sourcePoints = pathPoints.slice(0, 2);
+  const targetPoints = pathPoints.slice(-2);
+  
+  // Construir nuevo path que pase por los control points
+  let newPath = `M${sourcePoints[0].x},${sourcePoints[0].y} L${sourcePoints[1].x},${sourcePoints[1].y}`;
+  
+  // Conectar desde el último punto del source hacia los control points
+  if (controlPoints.length > 0) {
+    // Usar curvas cuadráticas para conectar los puntos suavemente
+    for (let i = 0; i < controlPoints.length; i++) {
+      const point = controlPoints[i];
+      
+      if (i === 0) {
+        // Primera curva desde el source
+        newPath += ` Q${point.x},${point.y} `;
+        if (controlPoints.length === 1) {
+          // Solo un punto, ir directo al target
+          newPath += `${targetPoints[0].x},${targetPoints[0].y}`;
+        } else {
+          // Punto medio hacia el siguiente
+          const nextPoint = controlPoints[i + 1];
+          const midX = (point.x + nextPoint.x) / 2;
+          const midY = (point.y + nextPoint.y) / 2;
+          newPath += `${midX},${midY}`;
+        }
+      } else if (i === controlPoints.length - 1) {
+        // Última curva hacia el target
+        newPath += ` Q${point.x},${point.y} ${targetPoints[0].x},${targetPoints[0].y}`;
+      } else {
+        // Curvas intermedias
+        const nextPoint = controlPoints[i + 1];
+        const midX = (point.x + nextPoint.x) / 2;
+        const midY = (point.y + nextPoint.y) / 2;
+        newPath += ` Q${point.x},${point.y} ${midX},${midY}`;
+      }
+    }
+  } else {
+    // Sin control points, conectar directo al target
+    newPath += ` L${targetPoints[0].x},${targetPoints[0].y}`;
+  }
+  
+  // Agregar el segmento final (target + arrow)
+  newPath += ` L${targetPoints[1].x},${targetPoints[1].y}`;
+  
+  return newPath;
+}
+
+export default ConnectionPath;
