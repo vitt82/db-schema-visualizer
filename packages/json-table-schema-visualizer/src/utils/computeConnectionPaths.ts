@@ -1,7 +1,8 @@
-import { getBezierPath, getStepPathWithRoundedCorners, getStepPathWithRoundedCornersAndMidpoint } from './computeEgde/computeBezierEdge';
+import { getBezierPath, getStepPathWithRoundedCorners, getStepPathWithRoundedCornersAndMidpoint, getStepPathWithRoundedCornersAndWaypoints } from './computeEgde/computeBezierEdge';
 import { getRelationSymbol } from "./getRelationSymbol";
 
 import { type Position, type XYPosition } from "@/types/positions";
+import { type ConnectionType } from "@/stores/connectionTypeStore";
 
 interface Props {
   sourceXY: XYPosition;
@@ -11,10 +12,9 @@ interface Props {
   relationSource: string;
   relationTarget: string;
   midpoint?: XYPosition;
+  waypoints?: XYPosition[];
+  connectionType?: ConnectionType;
 }
-
-// Use smooth step for a cleaner, more angular look
-const USE_SMOOTH_STEP = true;
 
 export const computeConnectionPathWithSymbols = ({
   relationSource,
@@ -24,9 +24,19 @@ export const computeConnectionPathWithSymbols = ({
   sourcePosition,
   targetPosition,
   midpoint,
+  waypoints,
+  connectionType = 'bezier',
 }: Props): string => {
-  const linePath = USE_SMOOTH_STEP
-    ? midpoint != null
+  const linePath = connectionType === 'smoothstep'
+    ? waypoints != null && waypoints.length > 0
+      ? getStepPathWithRoundedCornersAndWaypoints({
+          sourcePosition,
+          targetPosition,
+          source: sourceXY,
+          target: targetXY,
+          waypoints,
+        })
+      : midpoint != null
       ? getStepPathWithRoundedCornersAndMidpoint({
           sourcePosition,
           targetPosition,

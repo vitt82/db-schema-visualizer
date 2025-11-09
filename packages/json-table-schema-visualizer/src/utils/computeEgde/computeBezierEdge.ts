@@ -271,4 +271,111 @@ export function getStepPathWithRoundedCornersAndMidpoint({
   return pathData;
 }
 
+/**
+ * Generate smoothstep path through multiple waypoints (control points)
+ * Creates orthogonal paths (rectilinear) with rounded corners
+ */
+export function getStepPathWithRoundedCornersAndWaypoints({
+  source,
+  sourcePosition = Position.Bottom,
+  target,
+  targetPosition = Position.Top,
+  waypoints = [],
+}: GetBezierPathParams & { waypoints: XYPosition[] }): string {
+  const sourceOffset = compteSymbolOffset(sourcePosition, source);
+  const targetOffset = compteSymbolOffset(targetPosition, target);
+
+  const startX = source.x + sourceOffset.x;
+  const startY = source.y + sourceOffset.y;
+  const endX = target.x + targetOffset.x;
+  const endY = target.y + targetOffset.y;
+
+  if (waypoints.length === 0) {
+    // Fallback to standard path
+    return getStepPathWithRoundedCorners({
+      source,
+      sourcePosition,
+      target,
+      targetPosition,
+    });
+  }
+
+  const cornerRadius = 15;
+  let pathData = `M${startX},${startY}`;
+
+  // Create segments: source -> waypoint[0] -> waypoint[1] -> ... -> target
+  const allPoints = [{ x: startX, y: startY }, ...waypoints, { x: endX, y: endY }];
+
+  for (let i = 0; i < allPoints.length - 1; i++) {
+    const current = allPoints[i];
+    const next = allPoints[i + 1];
+
+    const dx = next.x - current.x;
+    const dy = next.y - current.y;
+
+    if (dx === 0 && dy === 0) {
+      // Skip if same point
+      continue;
+    }
+
+    // Determine if we go horizontal first or vertical first
+    // This creates the smoothstep orthogonal pattern
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Go horizontal first, then vertical
+      const midX = next.x;
+
+      // Horizontal line with corner
+      const cornerXDist = Math.min(cornerRadius, Math.abs(dx) * 0.3);
+      const cornerX = dx > 0 ? midX - cornerXDist : midX + cornerXDist;
+      pathData += ` L${cornerX},${current.y}`;
+
+      // Rounded corner
+      if (cornerRadius > 0) {
+        const cornerYStart = dy > 0 ? current.y + cornerRadius : current.y - cornerRadius;
+        pathData += ` Q${midX},${current.y} ${midX},${cornerYStart}`;
+
+        // Vertical line to waypoint
+        const cornerYEnd = dy > 0 ? next.y - cornerRadius : next.y + cornerRadius;
+        if (cornerYEnd !== cornerYStart) {
+          pathData += ` L${midX},${cornerYEnd}`;
+        }
+
+        // Final corner and line
+        pathData += ` Q${midX},${next.y} ${next.x},${next.y}`;
+      } else {
+        pathData += ` L${midX},${next.y}`;
+        pathData += ` L${next.x},${next.y}`;
+      }
+    } else {
+      // Go vertical first, then horizontal
+      const midY = next.y;
+
+      // Vertical line with corner
+      const cornerYDist = Math.min(cornerRadius, Math.abs(dy) * 0.3);
+      const cornerY = dy > 0 ? midY - cornerYDist : midY + cornerYDist;
+      pathData += ` L${current.x},${cornerY}`;
+
+      // Rounded corner
+      if (cornerRadius > 0) {
+        const cornerXStart = dx > 0 ? current.x + cornerRadius : current.x - cornerRadius;
+        pathData += ` Q${current.x},${midY} ${cornerXStart},${midY}`;
+
+        // Horizontal line to waypoint
+        const cornerXEnd = dx > 0 ? next.x - cornerRadius : next.x + cornerRadius;
+        if (cornerXEnd !== cornerXStart) {
+          pathData += ` L${cornerXEnd},${midY}`;
+        }
+
+        // Final corner and line
+        pathData += ` Q${next.x},${midY} ${next.x},${next.y}`;
+      } else {
+        pathData += ` L${next.x},${midY}`;
+        pathData += ` L${next.x},${next.y}`;
+      }
+    }
+  }
+
+  return pathData;
+}
+
 

@@ -342,7 +342,7 @@ const TableGroup = ({ group, onRequestRename }: TableGroupProps) => {
       <KonvaText
         x={PADDINGS.md}
         y={12}
-        text={`${group.name} (${group.tableNames.length} tabla${group.tableNames.length !== 1 ? "s" : ""}${(group.enumNames?.length ?? 0) > 0 ? `, ${group.enumNames?.length ?? 0} enum${(group.enumNames?.length ?? 0) !== 1 ? "s" : ""}` : ""})`}
+        text={group.name}
         fontSize={30}
         fontStyle="bold"
         fill={textColor}

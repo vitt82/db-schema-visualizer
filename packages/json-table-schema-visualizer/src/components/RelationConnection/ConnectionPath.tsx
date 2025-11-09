@@ -35,12 +35,12 @@ const ConnectionPath = ({
   const sourceTableColors = useTableColor(relationOwner);
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [midPoint, setMidPoint] = useState<Point | null>(null);
+  const [waypoints, setWaypoints] = useState<Point[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const pathRef = useRef<Konva.Path>(null);
   const groupRef = useRef<Konva.Group>(null);
 
-  // Load saved midpoint on mount
+  // Load saved waypoints on mount
   useEffect(() => {
     const savedPoints = connectionControlPointsStore.getControlPoints(
       sourceTableName,
@@ -51,7 +51,8 @@ const ConnectionPath = ({
     );
 
     if (savedPoints.length > 0) {
-      setMidPoint({ x: savedPoints[0].x, y: savedPoints[0].y });
+      // If we have saved points, use them as waypoints
+      setWaypoints(savedPoints.map((p) => ({ x: p.x, y: p.y })));
     }
   }, [sourceTableName, sourceFieldName, targetTableName, targetFieldName, relationOwner]);
 
@@ -64,67 +65,61 @@ const ConnectionPath = ({
     ? sourceTableColors?.regular ?? themeColors.connection.active
     : themeColors.connection.default;
 
-  const handleMidPointDragMove = (x: number, y: number): void => {
-    setMidPoint({ x, y });
-
-    const savedPoints = connectionControlPointsStore.getControlPoints(
-      sourceTableName,
-      sourceFieldName,
-      targetTableName,
-      targetFieldName,
-      relationOwner
-    );
-
-    if (savedPoints.length > 0) {
-      connectionControlPointsStore.moveControlPoint(
-        sourceTableName,
-        sourceFieldName,
-        targetTableName,
-        targetFieldName,
-        relationOwner,
-        savedPoints[0].id,
-        { x, y }
-      );
-    } else {
-      connectionControlPointsStore.addControlPoint(
-        sourceTableName,
-        sourceFieldName,
-        targetTableName,
-        targetFieldName,
-        relationOwner,
-        { x, y }
-      );
-    }
-  };
-
-  const handleMidPointDragEnd = (): void => {
-    setIsDragging(false);
-  };
-
   const handlePathClick = (e: Konva.KonvaEventObject<MouseEvent>): void => {
     e.cancelBubble = true;
 
     if (!isEditing) {
       setIsEditing(true);
 
-      // Save initial midpoint if not already saved
-      const savedPoints = connectionControlPointsStore.getControlPoints(
-        sourceTableName,
-        sourceFieldName,
-        targetTableName,
-        targetFieldName,
-        relationOwner
-      );
+      // Get the exact click position relative to the stage
+      const stage = pathRef.current?.getStage();
+      if (stage != null) {
+        const pointerPos = stage.getPointerPosition();
+        if (pointerPos != null) {
+          const clickPoint = { x: pointerPos.x, y: pointerPos.y };
 
-      if (savedPoints.length === 0 && midPoint != null) {
-        connectionControlPointsStore.addControlPoint(
-          sourceTableName,
-          sourceFieldName,
-          targetTableName,
-          targetFieldName,
-          relationOwner,
-          midPoint
-        );
+          // Create 3 waypoints: one third, middle, two thirds along the line
+          // For now, we'll create a simple 3-point structure
+          const threeWaypoints = [
+            clickPoint,
+            { x: clickPoint.x + 50, y: clickPoint.y },
+            { x: clickPoint.x + 100, y: clickPoint.y },
+          ];
+
+          setWaypoints(threeWaypoints);
+
+          // Save all 3 points to the store
+          const savedPoints = connectionControlPointsStore.getControlPoints(
+            sourceTableName,
+            sourceFieldName,
+            targetTableName,
+            targetFieldName,
+            relationOwner
+          );
+
+          // Clear old points
+          if (savedPoints.length > 0) {
+            connectionControlPointsStore.clearControlPoints(
+              sourceTableName,
+              sourceFieldName,
+              targetTableName,
+              targetFieldName,
+              relationOwner
+            );
+          }
+
+          // Add 3 new points
+          threeWaypoints.forEach((point) => {
+            connectionControlPointsStore.addControlPoint(
+              sourceTableName,
+              sourceFieldName,
+              targetTableName,
+              targetFieldName,
+              relationOwner,
+              point
+            );
+          });
+        }
       }
 
       try { groupRef.current?.moveToTop(); } catch {}
@@ -163,19 +158,48 @@ const ConnectionPath = ({
         cursor={isEditing ? "default" : "pointer"}
       />
 
-      {/* Edit mode control point */}
-      {isEditing && midPoint != null && (
+      {/* Edit mode control points (3 waypoints) */}
+      {isEditing && waypoints.length > 0 && waypoints.map((point, index) => (
         <MidPointControl
-          x={midPoint.x}
-          y={midPoint.y}
+          key={`waypoint-${index}`}
+          x={point.x}
+          y={point.y}
           radius={CONTROL_POINT_RADIUS}
           strokeColor={strokeColor}
           backgroundColor={themeColors.bg}
           isDragging={isDragging}
-          onDragMove={handleMidPointDragMove}
-          onDragEnd={handleMidPointDragEnd}
+          onDragMove={(x, y) => {
+            // Update specific waypoint
+            const updated = [...waypoints];
+            updated[index] = { x, y };
+            setWaypoints(updated);
+
+            // Update store
+            const savedPoints = connectionControlPointsStore.getControlPoints(
+              sourceTableName,
+              sourceFieldName,
+              targetTableName,
+              targetFieldName,
+              relationOwner
+            );
+
+            if (savedPoints[index] != null) {
+              connectionControlPointsStore.moveControlPoint(
+                sourceTableName,
+                sourceFieldName,
+                targetTableName,
+                targetFieldName,
+                relationOwner,
+                savedPoints[index].id,
+                { x, y }
+              );
+            }
+          }}
+          onDragEnd={() => {
+            setIsDragging(false);
+          }}
         />
-      )}
+      ))}
     </Group>
   );
 };

@@ -72,13 +72,17 @@ const GroupControlPanel = () => {
   const handleStartEdit = (group: JSONTableGroup & { x: number; y: number; width: number; height: number }) => {
     setEditingGroup(group.id);
     setEditName(group.name);
-    setEditColor(group.color);
+    setEditColor(group.color ?? PRESET_COLORS[0]);
+  };
+
+  const handleColorChange = (color: string) => {
+    setEditColor(color);
   };
 
   const handleSaveEdit = () => {
-    if (editingGroup) {
+    if (editingGroup != null) {
       const group = tableGroupsStore.getGroup(editingGroup);
-      if (group) {
+      if (group != null) {
         tableGroupsStore.setGroup({
           ...group,
           name: editName,
@@ -100,7 +104,7 @@ const GroupControlPanel = () => {
     return (
       <div className="fixed top-4 right-4 z-50">
         <button
-          onClick={() => setIsExpanded(true)}
+          onClick={() => { setIsExpanded(true); }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-colors"
         >
           Grupos ({groups.length})
@@ -117,7 +121,7 @@ const GroupControlPanel = () => {
           Grupos de Tablas
         </h3>
         <button
-          onClick={() => setIsExpanded(false)}
+          onClick={() => { setIsExpanded(false); }}
           className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
         >
           <X size={20} className="text-gray-600 dark:text-gray-300" />
@@ -168,7 +172,7 @@ const GroupControlPanel = () => {
                   <input
                     type="text"
                     value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
+                    onChange={(e) => { setEditName(e.target.value); }}
                     className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="Nombre del grupo"
                   />
@@ -176,7 +180,7 @@ const GroupControlPanel = () => {
                     {PRESET_COLORS.map((color) => (
                       <button
                         key={color}
-                        onClick={() => setEditColor(color)}
+                        onClick={() => { handleColorChange(color); }}
                         className={`w-8 h-8 rounded-full border-2 ${
                           editColor === color ? 'border-gray-900 dark:border-white' : 'border-gray-300 dark:border-gray-600'
                         }`}
@@ -216,13 +220,13 @@ const GroupControlPanel = () => {
                     </div>
                     <div className="flex gap-1">
                       <button
-                        onClick={() => handleStartEdit(group)}
+                        onClick={() => { handleStartEdit(group); }}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                       >
                         <Edit2 size={16} className="text-blue-600 dark:text-blue-400" />
                       </button>
                       <button
-                        onClick={() => handleDeleteGroup(group.id)}
+                        onClick={() => { handleDeleteGroup(group.id); }}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                       >
                         <Trash2 size={16} className="text-red-600 dark:text-red-400" />

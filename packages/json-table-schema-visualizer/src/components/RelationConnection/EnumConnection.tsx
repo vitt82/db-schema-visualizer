@@ -12,6 +12,7 @@ import { computeConnectionPathWithSymbols } from "@/utils/computeConnectionPaths
 import { computeConnectionHandlePos } from "@/utils/computeConnectionHandlePositions";
 import { tableCoordsStore } from "@/stores/tableCoords";
 import { enumCoordsStore } from "@/stores/enumCoords";
+import { connectionTypeStore, type ConnectionType } from "@/stores/connectionTypeStore";
 import { useRelationsColsY } from "@/hooks/relationConnection";
 import { useTableWidthStoredValue } from "@/hooks/tableWidthStore";
 import { useGetEnum } from "@/hooks/enums";
@@ -41,6 +42,7 @@ const EnumConnection = ({
   const [targetEnumCoords, setTargetEnumCoords] = useState(() =>
     enumCoordsStore.getCoords(enumName),
   );
+  const [connectionType, setConnectionType] = useState<ConnectionType>('bezier');
 
   // compute source col index y
   const fakeSource: RelationItem = {
@@ -89,6 +91,15 @@ const EnumConnection = ({
       eventEmitter.removeListener(targetEnumDragEventName, coordsUpdater);
     };
   }, [targetEnumDragEventName]);
+
+  // Subscribe to connection type changes
+  useEffect(() => {
+    setConnectionType(connectionTypeStore.getConnectionType());
+    const unsubscribe = connectionTypeStore.subscribe((type) => {
+      setConnectionType(type);
+    });
+    return unsubscribe;
+  }, []);
 
   const [sourcePosition, targetPosition, finalSourceX, finalTargetX] =
     computeConnectionHandlePos({
@@ -170,6 +181,7 @@ const EnumConnection = ({
         targetPosition: resolvedTargetPosition,
         relationSource: "?",
         relationTarget: "?",
+        connectionType,
       }),
     [
       sourceXY.x,
@@ -178,6 +190,7 @@ const EnumConnection = ({
       targetXY.y,
       resolvedSourcePosition,
       resolvedTargetPosition,
+      connectionType,
     ],
   );
 

@@ -8,6 +8,7 @@ import type { XYPosition } from "@/types/positions";
 import { useRelationsCoords } from "@/hooks/relationConnection";
 import { computeConnectionPathWithSymbols } from "@/utils/computeConnectionPaths";
 import { connectionControlPointsStore } from "@/stores/connectionControlPoints";
+import { connectionTypeStore, type ConnectionType } from "@/stores/connectionTypeStore";
 
 interface RelationConnectionProps {
   source: RelationItem;
@@ -24,9 +25,10 @@ const RelationConnection = ({ source, target }: RelationConnectionProps) => {
   const relationOwner =
     source.relation === "1" ? source.tableName : target.tableName;
 
-  const [midpoint, setMidpoint] = useState<XYPosition | undefined>();
+  const [waypoints, setWaypoints] = useState<XYPosition[]>([]);
+  const [connectionType, setConnectionType] = useState<ConnectionType>('bezier');
 
-  // Load midpoint from store and subscribe to changes
+  // Load waypoints from store and subscribe to changes
   useEffect(() => {
     const savedPoints = connectionControlPointsStore.getControlPoints(
       source.tableName,
@@ -37,9 +39,9 @@ const RelationConnection = ({ source, target }: RelationConnectionProps) => {
     );
 
     if (savedPoints.length > 0) {
-      setMidpoint({ x: savedPoints[0].x, y: savedPoints[0].y });
+      setWaypoints(savedPoints.map((p) => ({ x: p.x, y: p.y })));
     } else {
-      setMidpoint(undefined);
+      setWaypoints([]);
     }
 
     // Poll for changes from store (triggered by ConnectionPath drag)
@@ -53,16 +55,25 @@ const RelationConnection = ({ source, target }: RelationConnectionProps) => {
       );
 
       if (current.length > 0) {
-        setMidpoint({ x: current[0].x, y: current[0].y });
+        setWaypoints(current.map((p) => ({ x: p.x, y: p.y })));
       } else {
-        setMidpoint(undefined);
+        setWaypoints([]);
       }
-    }, 50); // Poll every 50ms (less aggressive than 16ms)
+    }, 30); // Poll every 30ms for smoother updates
 
     return () => {
       clearInterval(interval);
     };
   }, [source.tableName, source.fieldNames, target.tableName, target.fieldNames, relationOwner]);
+
+  // Subscribe to connection type changes
+  useEffect(() => {
+    setConnectionType(connectionTypeStore.getConnectionType());
+    const unsubscribe = connectionTypeStore.subscribe((type) => {
+      setConnectionType(type);
+    });
+    return unsubscribe;
+  }, []);
 
   const linePath = useMemo(() => {
     return computeConnectionPathWithSymbols({
@@ -72,9 +83,10 @@ const RelationConnection = ({ source, target }: RelationConnectionProps) => {
       targetPosition,
       relationSource: source.relation,
       relationTarget: target.relation,
-      midpoint,
+      waypoints: connectionType === 'smoothstep' && waypoints.length > 0 ? waypoints : undefined,
+      connectionType,
     });
-  }, [sourcePosition, targetPosition, sourceX, targetX, sourceY, targetY, midpoint]);
+  }, [sourcePosition, targetPosition, sourceX, targetX, sourceY, targetY, waypoints, connectionType]);
 
   return (
     <>
